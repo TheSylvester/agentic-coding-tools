@@ -1,0 +1,49 @@
+# Private/sensitive files
+settings.json
+settings.local.json
+.credentials.json
+stats-cache.json
+handoff-signatures.json
+
+# History and logs
+history.jsonl
+*.log
+hooks.log
+
+# Cache and runtime directories
+cache/
+debug/
+file-history/
+paste-cache/
+plans/
+session-env/
+shell-snapshots/
+statsig/
+telemetry/
+todos/
+ide/
+chrome/
+projects/
+
+# Plugins installed from other sources
+plugins/
+
+# Working/temp directories
+ai-reference/
+
+# Custom scripts (optional - remove if you want to share)
+statusline.py
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Nested git repos
+skills/codex/.git/

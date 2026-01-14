@@ -1,0 +1,417 @@
+#!/usr/bin/env python3
+"""
+Convert Claude Code JSONL transcript files to human-readable format.
+
+Token-efficient reader that strips metadata and extracts conversation flow.
+Use this instead of reading raw JSONL when you need the conversation content.
+
+Usage:
+    python jsonl-to-readable.py <transcript.jsonl> [options]
+
+Options:
+    --summary           Include metadata header (dir, branch, timestamps)
+    --no-tools          Omit tool calls/results (text exchanges only)
+    --thinking          Include thinking blocks (usually skip to save tokens)
+    --compact           Denser output format
+    --inline-subagents  Recursively inline sub-agent transcripts
+"""
+
+import json
+import argparse
+import sys
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, Dict, Any
+
+
+def is_claude_transcript(file_path: Path) -> bool:
+    """
+    Detect if a JSONL file is a Claude Code transcript.
+    Checks first few lines for: sessionId, type, message with role/content.
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines_checked = 0
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    return False
+
+                has_session_id = 'sessionId' in entry
+                has_type = 'type' in entry
+                has_message = 'message' in entry
+                has_timestamp = 'timestamp' in entry
+
+                if has_message and isinstance(entry.get('message'), dict):
+                    msg = entry['message']
+                    if 'role' in msg and 'content' in msg:
+                        return True
+
+                if has_session_id and has_type and has_timestamp:
+                    return True
+
+                lines_checked += 1
+                if lines_checked >= 3:
+                    break
+            return False
+    except Exception:
+        return False
+
+
+def format_timestamp(iso_timestamp: str) -> str:
+    """Convert ISO timestamp to readable format."""
+    try:
+        dt = datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00"))
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except:
+        return iso_timestamp
+
+
+def format_tool_input(tool_name: str, tool_input: Dict) -> str:
+    """Format tool input based on tool type."""
+    tool_name_lower = tool_name.lower()
+
+    # Sub-agent Task dispatch (fan-out)
+    if tool_name == "Task":
+        desc = tool_input.get("description", "")
+        prompt = tool_input.get("prompt", "")
+        return f"[SPAWN] {desc}" + (f"\n  prompt: {prompt[:200]}..." if prompt and len(prompt) > 200 else f"\n  prompt: {prompt}" if prompt else "")
+
+    # File operations
+    if any(x in tool_name_lower for x in ["read", "write", "edit", "file"]):
+        file_path = (
+            tool_input.get("file_path")
+            or tool_input.get("path")
+            or tool_input.get("target_file", "")
+        )
+        if file_path:
+            return f"-> {file_path}"
+
+    # Search/grep operations
+    if any(x in tool_name_lower for x in ["grep", "search", "find", "glob"]):
+        pattern = (
+            tool_input.get("pattern")
+            or tool_input.get("query")
+            or tool_input.get("regex", "")
+        )
+        if pattern:
+            return f"pattern: {pattern}"
+
+    # Bash/shell commands
+    if any(x in tool_name_lower for x in ["bash", "shell", "terminal", "command", "exec"]):
+        command = tool_input.get("command") or tool_input.get("cmd", "")
+        if command:
+            # Truncate long commands
+            if len(command) > 100:
+                return f"$ {command[:100]}..."
+            return f"$ {command}"
+
+    # List directory
+    if "list" in tool_name_lower or "ls" in tool_name_lower or "dir" in tool_name_lower:
+        path = tool_input.get("path") or tool_input.get("directory", "")
+        if path:
+            return f"-> {path}"
+
+    # Default: show key-value pairs (truncated)
+    if tool_input:
+        items = list(tool_input.items())[:3]
+        summary = ", ".join(f"{k}: {str(v)[:50]}" for k, v in items)
+        if len(tool_input) > 3:
+            summary += f" (+{len(tool_input) - 3} more)"
+        return summary
+
+    return ""
+
+
+def extract_text_content(
+    content: Any,
+    include_tools: bool = True,
+    include_thinking: bool = False,
+    tool_use_result: Optional[Dict] = None,
+) -> str:
+    """Extract readable text from message content."""
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                item_type = item.get("type")
+
+                if item_type == "text":
+                    parts.append(item.get("text", ""))
+
+                elif item_type == "thinking" and include_thinking:
+                    thinking_text = item.get("thinking", "")
+                    if thinking_text:
+                        parts.append(f"[Thinking]\n{thinking_text}")
+
+                elif item_type == "tool_use" and include_tools:
+                    tool_name = item.get("name", "unknown")
+                    tool_input = item.get("input", {})
+                    input_summary = format_tool_input(tool_name, tool_input)
+                    parts.append(f"[Tool: {tool_name}] {input_summary}")
+
+                elif item_type == "tool_result" and include_tools:
+                    tool_content = item.get("content", "")
+                    result_header = "[Tool Result]"
+                    if tool_use_result and isinstance(tool_use_result, dict):
+                        agent_id = tool_use_result.get("agentId")
+                        if agent_id:
+                            duration = tool_use_result.get("totalDurationMs", 0)
+                            result_header = f"[Sub-Agent Result: {agent_id}] ({duration}ms)"
+                    # Truncate long tool results
+                    if len(str(tool_content)) > 500:
+                        tool_content = str(tool_content)[:500] + "... [truncated]"
+                    parts.append(f"{result_header}\n{tool_content}")
+
+        return "\n".join(parts)
+
+    return str(content)
+
+
+def is_skippable_content(
+    content: Any, include_tools: bool = True, include_thinking: bool = False
+) -> bool:
+    """Check if content should be skipped (no displayable content)."""
+    if isinstance(content, str):
+        return False
+    if isinstance(content, list):
+        for item in content:
+            if isinstance(item, dict):
+                item_type = item.get("type")
+                if item_type == "text":
+                    return False
+                if item_type == "thinking" and include_thinking:
+                    return False
+                if item_type in ("tool_use", "tool_result") and include_tools:
+                    return False
+            else:
+                return False
+        return True
+    return False
+
+
+def process_entry(
+    entry: Dict,
+    compact: bool = False,
+    include_tools: bool = True,
+    include_thinking: bool = False,
+    base_dir: Optional[Path] = None,
+    inline_subagents: bool = False,
+    indent_level: int = 0,
+) -> Optional[str]:
+    """Process a single JSONL entry into readable format."""
+    message = entry.get("message", {})
+    timestamp = entry.get("timestamp", "")
+    tool_use_result = entry.get("toolUseResult", {})
+
+    agent_id = entry.get("agentId")
+    is_sidechain = entry.get("isSidechain", False)
+
+    indent_str = "    " * indent_level
+
+    if not message:
+        return None
+
+    role = message.get("role", "")
+    content = message.get("content", "")
+
+    if not content:
+        return None
+
+    if is_skippable_content(content, include_tools=include_tools, include_thinking=include_thinking):
+        return None
+
+    # Handle Sub-Agent Inlining
+    subagent_transcript = ""
+    if inline_subagents and base_dir and tool_use_result and tool_use_result.get("agentId"):
+        sub_agent_id = tool_use_result.get("agentId")
+        sub_file = base_dir / f"agent-{sub_agent_id}.jsonl"
+        if sub_file.exists():
+            sub_content = process_file(
+                sub_file,
+                include_summary=True,
+                include_tools=include_tools,
+                include_thinking=include_thinking,
+                compact=compact,
+                inline_subagents=True,
+                indent_level=indent_level + 1
+            )
+            header = f"\n{indent_str}>>> SUB-AGENT ({sub_agent_id}) START >>>\n"
+            footer = f"{indent_str}<<< SUB-AGENT ({sub_agent_id}) END <<<\n"
+            subagent_transcript = header + sub_content + footer
+
+    text = extract_text_content(
+        content,
+        include_tools=include_tools,
+        include_thinking=include_thinking,
+        tool_use_result=tool_use_result,
+    )
+
+    if not text.strip():
+        return None
+
+    time_str = format_timestamp(timestamp) if timestamp else ""
+    role_label = "USER" if role == "user" else "ASSISTANT"
+
+    agent_marker = ""
+    if is_sidechain and agent_id:
+        agent_marker = f" @{agent_id}"
+
+    indented_text = text.replace("\n", f"\n{indent_str}")
+
+    if compact:
+        return f"{indent_str}{role_label}{agent_marker} [{time_str}]: {indented_text}\n{subagent_transcript}"
+    else:
+        return f"\n{indent_str}--- {role_label}{agent_marker} [{time_str}] ---\n{indent_str}{indented_text}\n{subagent_transcript}"
+
+
+def process_file(
+    input_path: Path,
+    include_summary: bool = False,
+    include_tools: bool = True,
+    include_thinking: bool = False,
+    compact: bool = False,
+    inline_subagents: bool = False,
+    indent_level: int = 0,
+) -> str:
+    """Process a single JSONL file to readable format."""
+    entries = []
+    metadata = {}
+
+    indent_str = "    " * indent_level
+
+    with open(input_path, "r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                entries.append(entry)
+
+                if line_num == 1:
+                    metadata = {
+                        "session_id": entry.get("sessionId", ""),
+                        "agent_id": entry.get("agentId", ""),
+                        "is_sidechain": entry.get("isSidechain", False),
+                        "cwd": entry.get("cwd", ""),
+                        "git_branch": entry.get("gitBranch", ""),
+                    }
+            except json.JSONDecodeError:
+                continue
+
+    output_lines = []
+
+    # Summary header
+    if include_summary and metadata:
+        is_subagent = metadata.get("is_sidechain", False)
+        agent_id = metadata.get("agent_id", "")
+
+        if is_subagent and agent_id:
+            output_lines.append(f"{indent_str}=== SUB-AGENT TRANSCRIPT ({agent_id}) ===")
+        else:
+            output_lines.append(f"{indent_str}=== CLAUDE CODE TRANSCRIPT ===")
+
+        if metadata.get("cwd"):
+            output_lines.append(f"{indent_str}Dir: {metadata['cwd']}")
+        if metadata.get("git_branch"):
+            output_lines.append(f"{indent_str}Branch: {metadata['git_branch']}")
+        if entries:
+            first_ts = entries[0].get("timestamp", "")
+            last_ts = entries[-1].get("timestamp", "")
+            if first_ts:
+                output_lines.append(f"{indent_str}Started: {format_timestamp(first_ts)}")
+            if last_ts:
+                output_lines.append(f"{indent_str}Ended: {format_timestamp(last_ts)}")
+        output_lines.append(f"{indent_str}Entries: {len(entries)}")
+        output_lines.append("")
+
+    # Process entries
+    for entry in entries:
+        formatted = process_entry(
+            entry,
+            compact=compact,
+            include_tools=include_tools,
+            include_thinking=include_thinking,
+            base_dir=input_path.parent,
+            inline_subagents=inline_subagents,
+            indent_level=indent_level,
+        )
+        if formatted:
+            output_lines.append(formatted)
+
+    return "\n".join(output_lines)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Convert Claude Code JSONL transcripts to human-readable format.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s transcript.jsonl                  # Basic output to stdout
+  %(prog)s transcript.jsonl --summary        # Include metadata header
+  %(prog)s transcript.jsonl --no-tools       # Text exchanges only
+  %(prog)s transcript.jsonl --compact        # Denser output
+  %(prog)s transcript.jsonl --inline-subagents  # Include sub-agent transcripts
+        """,
+    )
+
+    parser.add_argument("input", type=Path, help="Input JSONL transcript file")
+    parser.add_argument(
+        "--summary", action="store_true", help="Include metadata header (dir, branch, timestamps)"
+    )
+    parser.add_argument(
+        "--no-tools", action="store_true", help="Omit tool calls and results"
+    )
+    parser.add_argument(
+        "--thinking", action="store_true", help="Include thinking/reasoning blocks"
+    )
+    parser.add_argument(
+        "--compact", action="store_true", help="Compact output format"
+    )
+    parser.add_argument(
+        "--inline-subagents", action="store_true", help="Recursively inline sub-agent transcripts"
+    )
+
+    args = parser.parse_args()
+
+    input_path = args.input.expanduser().resolve()
+
+    if not input_path.exists():
+        print(f"Error: File not found: {input_path}", file=sys.stderr)
+        sys.exit(1)
+
+    if not input_path.is_file():
+        print(f"Error: Not a file: {input_path}", file=sys.stderr)
+        sys.exit(1)
+
+    # Validate it's a Claude transcript
+    if not is_claude_transcript(input_path):
+        print(f"Error: Not a Claude Code transcript: {input_path}", file=sys.stderr)
+        print("Use the Read tool directly for non-transcript JSONL files.", file=sys.stderr)
+        sys.exit(1)
+
+    include_tools = not args.no_tools
+
+    result = process_file(
+        input_path,
+        include_summary=args.summary,
+        include_tools=include_tools,
+        include_thinking=args.thinking,
+        compact=args.compact,
+        inline_subagents=args.inline_subagents,
+    )
+
+    print(result)
+
+
+if __name__ == "__main__":
+    main()

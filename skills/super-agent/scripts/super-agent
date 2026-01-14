@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""
+super-agent: SDK-based agent runner with full sub-agent capabilities.
+
+Reads prompt from PROMPT_FILE, args, or stdin and runs via the Agent SDK.
+Transcripts land in ~/.claude/projects/<cwd-slug>/.
+"""
+
+import os
+import sys
+import asyncio
+import argparse
+from pathlib import Path
+
+from claude_agent_sdk import query, ClaudeAgentOptions
+from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
+
+
+def get_prompt(args: list[str]) -> str:
+    """Get prompt from PROMPT_FILE, remaining args, or stdin."""
+    if (pf := os.environ.get("PROMPT_FILE")):
+        return Path(pf).read_text(encoding="utf-8").strip()
+    if args:
+        return " ".join(args).strip()
+    if not sys.stdin.isatty():
+        return sys.stdin.read().strip()
+    return ""
+
+
+async def run(prompt: str, resume: str | None, fork: bool, chrome: bool) -> int:
+    model = os.environ.get("SUPER_AGENT_MODEL")  # keep for drop-in compatibility
+    bypass = os.environ.get("BYPASS_PERMISSIONS") == "1"
+    debug = os.environ.get("SUPER_AGENT_DEBUG") == "1"
+
+    # Build options - use keyword args for all config
+    opts = ClaudeAgentOptions(
+        allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task", "WebSearch", "Skill"],
+        permission_mode="bypassPermissions" if bypass else "acceptEdits",
+        setting_sources=["user", "project", "local"],  # Full settings like CLI
+        system_prompt={"type": "preset", "preset": "claude_code"},  # Enable skills
+        model=model,  # None if not set, which uses default
+        resume=resume,  # Session ID to resume (if provided)
+        fork_session=fork,  # Fork instead of continue when resuming
+        extra_args={"chrome": None} if chrome else {},  # Enable Chrome MCP if chrome=True, else empty dict
+    )
+
+    exit_code = 0
+    session_id = None
+
+    async for message in query(prompt=prompt, options=opts):
+        # Stream assistant text content to stdout
+        if isinstance(message, AssistantMessage):
+            for block in message.content:
+                if isinstance(block, TextBlock):
+                    print(block.text, end="", flush=True)
+
+        # Handle final result - session_id is available here
+        if isinstance(message, ResultMessage):
+            session_id = message.session_id
+            # Ensure final newline after streaming text
+            print()
+
+            if debug:
+                print(f"[Session: {session_id}]", file=sys.stderr)
+                if message.total_cost_usd:
+                    print(f"[Cost: ${message.total_cost_usd:.4f}]", file=sys.stderr)
+
+            if message.is_error:
+                print(f"[Agent finished with: {message.subtype}]", file=sys.stderr)
+                exit_code = 1
+
+    return exit_code
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="SDK-based agent runner with full sub-agent capabilities",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Environment variables:
+  PROMPT_FILE           Read prompt from this file
+  SUPER_AGENT_MODEL     Override model (e.g., claude-sonnet-4-5)
+  BYPASS_PERMISSIONS=1  Run with bypassPermissions mode
+  SUPER_AGENT_DEBUG=1   Print session ID and cost to stderr
+  SESSION_ID            Session ID for --fork (alternative to --resume)
+
+Examples:
+  super-agent "Analyze the codebase"
+  PROMPT_FILE=task.md super-agent
+  cat task.md | super-agent
+  SESSION_ID=abc-123 super-agent --fork "Continue the analysis"
+        """,
+    )
+    parser.add_argument("prompt", nargs="*", help="Prompt text (or use PROMPT_FILE/stdin)")
+    parser.add_argument(
+        "--fork", "-f",
+        action="store_true",
+        help="Fork from SESSION_ID with full context (requires SESSION_ID env var or --resume)",
+    )
+    parser.add_argument(
+        "--resume", "-r",
+        metavar="SESSION_ID",
+        help="Resume or fork from this session ID",
+    )
+    parser.add_argument(
+        "--no-chrome",
+        action="store_true",
+        help="Disable Chrome browser automation (enabled by default)",
+    )
+
+    args = parser.parse_args()
+
+    prompt = get_prompt(args.prompt)
+    if not prompt:
+        parser.print_help(sys.stderr)
+        return 1
+
+    # Determine session ID: --resume flag takes precedence, then SESSION_ID env var
+    resume_id = args.resume or os.environ.get("SESSION_ID")
+
+    # Validate fork mode requires a session ID
+    if args.fork and not resume_id:
+        print("Error: --fork requires SESSION_ID env var or --resume flag", file=sys.stderr)
+        return 1
+
+    # Chrome enabled by default, can be disabled via flag or env var
+    use_chrome = not args.no_chrome and os.environ.get("SUPER_AGENT_CHROME") != "0"
+
+    try:
+        return asyncio.run(run(prompt, resume=resume_id, fork=args.fork, chrome=use_chrome))
+    except KeyboardInterrupt:
+        return 130
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

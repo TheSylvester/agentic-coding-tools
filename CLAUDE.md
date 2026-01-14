@@ -1,0 +1,9 @@
+- Ignore README.md in this directory (it's for the marketplace, not instructions).
+- When generating .md files, always write to a '<project-root>/.ai-reference/' folder. Never add .md files to the repo.
+- After generating any markdown prompts/specs/task files: /reflect to refine the product file(s) against the existing context where it could help.
+- Default to researching, sharing insight, and planning. Take implementation actions only when asked.
+- ALWAYS use sub-agents where possible for:
+  - **Parallel execution** of independent tasks (multi-file analysis, concurrent tests/builds)
+  - **Exploration & filtering** to scout codebases or research topics, returning only relevant findings
+  - **Focused analysis** in isolated context (single or parallel), then synthesizing conclusions in main thread
+- If you start a server and hit a port conflict, check `lsof -i :<port>`—if it's a prior instance of what you're starting, kill it and retry. Clean up any servers you start before session end.

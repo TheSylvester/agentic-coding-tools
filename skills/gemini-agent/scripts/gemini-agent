@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# gemini-agent: Non-interactive Gemini CLI wrapper.
+#
+# Usage:
+#   gemini-agent <prompt>                         # Args as prompt
+#   gemini-agent --model <model> <prompt>         # Specify model
+#   PROMPT_FILE=task.md gemini-agent              # Read from file
+#   cat task.md | gemini-agent                    # Read from stdin
+#
+# Environment variables:
+#   PROMPT_FILE          - Read prompt from this file
+#   GEMINI_MODEL         - Model to use (passed as --model)
+
+set -euo pipefail
+
+MODEL="${GEMINI_MODEL:-}"
+
+# Parse flags
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+# Determine prompt source: PROMPT_FILE > args > stdin
+HAS_STDIN=false
+[[ ! -t 0 ]] && HAS_STDIN=true
+
+if [[ -n "${PROMPT_FILE:-}" ]]; then
+  PROMPT="$(cat "$PROMPT_FILE")"
+elif [[ $# -gt 0 ]]; then
+  PROMPT="$*"
+elif [[ "$HAS_STDIN" == "true" ]]; then
+  PROMPT="$(cat || true)"
+else
+  echo "Usage: gemini-agent [--model <model>] <prompt>" >&2
+  echo "       PROMPT_FILE=task.md gemini-agent" >&2
+  echo "       cat task.md | gemini-agent" >&2
+  exit 1
+fi
+
+# Validate prompt
+if [[ -z "${PROMPT//[$' \t\r\n']/}" ]]; then
+  echo "Error: prompt is empty" >&2
+  exit 1
+fi
+
+# Verify gemini command exists
+if ! command -v gemini >/dev/null 2>&1; then
+  echo "Error: gemini command not found. Please install gemini CLI." >&2
+  exit 1
+fi
+
+# Auto-detect auth: use GCA if OAuth creds exist and no explicit auth set
+if [[ -z "${GEMINI_API_KEY:-}" && -z "${GOOGLE_GENAI_USE_VERTEXAI:-}" && -z "${GOOGLE_GENAI_USE_GCA:-}" ]]; then
+  if [[ -s "${HOME}/.gemini/oauth_creds.json" ]]; then
+    export GOOGLE_GENAI_USE_GCA=true
+  fi
+fi
+
+# Build and run command
+GEMINI_ARGS=(-y)
+[[ -n "$MODEL" ]] && GEMINI_ARGS+=(--model "$MODEL")
+
+exec gemini "${GEMINI_ARGS[@]}" --prompt "$PROMPT"

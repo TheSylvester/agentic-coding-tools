@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# cursor-agent: Non-interactive Cursor Agent wrapper.
+#
+# Usage:
+#   cursor-agent <prompt>                         # Args as prompt
+#   cursor-agent --fork <prompt>                  # Resume existing chat via CHAT_ID/SESSION_ID
+#   PROMPT_FILE=task.md cursor-agent              # Read from file
+#   cat task.md | cursor-agent                    # Read from stdin
+#
+# Environment variables:
+#   PROMPT_FILE          - Read prompt from this file
+#   CURSOR_AGENT_MODEL   - Model to use (passed as --model)
+#   CHAT_ID              - Required for --fork (fallback: SESSION_ID)
+#
+# Pass-through flags: --force, --approve-mcps, --browser
+
+set -euo pipefail
+
+MODEL="${CURSOR_AGENT_MODEL:-}"
+FORK_MODE=false
+PASSTHRU_FORCE=false
+PASSTHRU_APPROVE_MCPS=false
+PASSTHRU_BROWSER=false
+
+# Parse flags
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --fork|-f)
+      FORK_MODE=true
+      shift
+      ;;
+    --force)
+      PASSTHRU_FORCE=true
+      shift
+      ;;
+    --approve-mcps)
+      PASSTHRU_APPROVE_MCPS=true
+      shift
+      ;;
+    --browser)
+      PASSTHRU_BROWSER=true
+      shift
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+# Validate chat id if fork mode
+CHAT="${CHAT_ID:-${SESSION_ID:-}}"
+if [[ "$FORK_MODE" == "true" && -z "$CHAT" ]]; then
+  echo "Error: CHAT_ID (or SESSION_ID) required for --fork mode" >&2
+  exit 1
+fi
+
+# Determine prompt source: PROMPT_FILE > args > stdin
+if [[ -n "${PROMPT_FILE:-}" ]]; then
+  PROMPT="$(cat "$PROMPT_FILE")"
+elif [[ $# -gt 0 ]]; then
+  PROMPT="$*"
+elif [[ ! -t 0 ]]; then
+  PROMPT="$(cat || true)"
+else
+  echo "Usage: cursor-agent [--fork] <prompt>" >&2
+  echo "       PROMPT_FILE=task.md cursor-agent" >&2
+  echo "       cat task.md | cursor-agent" >&2
+  exit 1
+fi
+
+# Validate prompt
+if [[ -z "${PROMPT//[$' \t\r\n']/}" ]]; then
+  echo "Error: prompt is empty" >&2
+  exit 1
+fi
+
+# Verify cursor-agent command exists
+if ! command -v cursor-agent >/dev/null 2>&1; then
+  echo "Error: cursor-agent command not found" >&2
+  exit 1
+fi
+
+# Build command args
+CURSOR_ARGS=(--print)
+[[ -n "$MODEL" ]] && CURSOR_ARGS+=(--model "$MODEL")
+[[ "$FORK_MODE" == "true" ]] && CURSOR_ARGS+=(--resume "$CHAT")
+[[ "$PASSTHRU_FORCE" == "true" ]] && CURSOR_ARGS+=(--force)
+[[ "$PASSTHRU_APPROVE_MCPS" == "true" ]] && CURSOR_ARGS+=(--approve-mcps)
+[[ "$PASSTHRU_BROWSER" == "true" ]] && CURSOR_ARGS+=(--browser)
+
+exec cursor-agent "${CURSOR_ARGS[@]}" -- "$PROMPT"

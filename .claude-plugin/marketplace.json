@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "agentic-coding-tools",
+  "version": "1.0.0",
+  "description": "Agentic coding toolkit: sub-agent orchestration, prompt synthesis, and browser automation for Claude Code",
+  "owner": {
+    "name": "TheSylvester"
+  },
+  "plugins": [
+    {
+      "name": "agentic-coding-tools",
+      "source": ".",
+      "description": "Complete agentic coding toolkit with skills for sub-agent orchestration (super-agent, cursor-agent, gemini-agent), prompt synthesis commands (handoff-prompt-to, pair-prompt-to, reflect, walkthrough-prompt-to), and specialized agents (browser-qa, ui-clone)",
+      "version": "1.0.0",
+      "category": "development",
+      "strict": false
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "read-transcript",
+  "version": "1.0.0",
+  "description": "Read Claude Code .jsonl transcript files in a token-efficient format. Use instead of Read for conversation content.",
+  "author": {
+    "name": "TheSylvester"
+  }
+}

@@ -4,22 +4,29 @@
 # Usage:
 #   gemini-agent <prompt>                         # Args as prompt
 #   gemini-agent --model <model> <prompt>         # Specify model
+#   gemini-agent --resume <id> <prompt>           # Resume session
 #   PROMPT_FILE=task.md gemini-agent              # Read from file
 #   cat task.md | gemini-agent                    # Read from stdin
 #
 # Environment variables:
 #   PROMPT_FILE          - Read prompt from this file
 #   GEMINI_MODEL         - Model to use (passed as --model)
+#   GEMINI_SESSION       - Session ID/index to resume
 
 set -euo pipefail
 
 MODEL="${GEMINI_MODEL:-}"
+RESUME="${GEMINI_SESSION:-}"
 
 # Parse flags
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --model)
       MODEL="$2"
+      shift 2
+      ;;
+    --resume|-r)
+      RESUME="$2"
       shift 2
       ;;
     --)
@@ -68,8 +75,34 @@ if [[ -z "${GEMINI_API_KEY:-}" && -z "${GOOGLE_GENAI_USE_VERTEXAI:-}" && -z "${G
   fi
 fi
 
-# Build and run command
-GEMINI_ARGS=(-y)
+# Build command args
+GEMINI_ARGS=(-y --output-format json)
 [[ -n "$MODEL" ]] && GEMINI_ARGS+=(--model "$MODEL")
+[[ -n "$RESUME" ]] && GEMINI_ARGS+=(--resume "$RESUME")
 
-exec gemini "${GEMINI_ARGS[@]}" --prompt "$PROMPT"
+# Run and capture output (stderr to /dev/null to avoid mixing with JSON)
+OUTPUT=$(gemini "${GEMINI_ARGS[@]}" "$PROMPT" 2>/dev/null)
+
+# Extract response and session_id from JSON (output is pretty-printed multi-line JSON)
+if command -v jq >/dev/null 2>&1; then
+  RESPONSE=$(echo "$OUTPUT" | jq -r '.response // empty' 2>/dev/null)
+  SESSION_ID=$(echo "$OUTPUT" | jq -r '.session_id // empty' 2>/dev/null)
+else
+  # Fallback: basic extraction without jq
+  RESPONSE=$(echo "$OUTPUT" | grep -oP '"response"\s*:\s*"\K[^"]*' | head -1)
+  SESSION_ID=$(echo "$OUTPUT" | grep -oP '"session_id"\s*:\s*"\K[^"]*' | head -1)
+fi
+
+# Output response
+if [[ -n "$RESPONSE" ]]; then
+  echo "$RESPONSE"
+else
+  # If JSON parsing failed, output raw (minus stderr lines)
+  echo "$OUTPUT" | grep -v "^YOLO mode\|^Loaded cached"
+fi
+
+# Always output session ID for caller to capture
+if [[ -n "$SESSION_ID" ]]; then
+  echo ""
+  echo "[session_id: $SESSION_ID]"
+fi

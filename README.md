@@ -4,9 +4,39 @@ A Claude Code plugin marketplace for sub-agent orchestration, prompt synthesis, 
 
 ## Installation
 
+### Install Everything
+
 ```bash
 /plugin marketplace add TheSylvester/agentic-coding-tools
 /plugin install agentic-coding-tools
+```
+
+### Install Individual Items
+
+After adding the marketplace, you can manually copy individual items to your `~/.claude/` directory:
+
+**Skills** (copy entire folder):
+```bash
+# Example: install just super-agent
+cp -r ~/.claude/plugins/agentic-coding-tools/skills/super-agent ~/.claude/skills/
+```
+
+**Commands** (copy .md file):
+```bash
+# Example: install just handoff-prompt-to
+cp ~/.claude/plugins/agentic-coding-tools/commands/handoff-prompt-to.md ~/.claude/commands/
+```
+
+**Agents** (copy .md file):
+```bash
+# Example: install just browser-qa agent
+cp ~/.claude/plugins/agentic-coding-tools/agents/browser-qa.md ~/.claude/agents/
+```
+
+Or clone the repo and symlink what you need:
+```bash
+git clone https://github.com/TheSylvester/agentic-coding-tools.git ~/dev/agentic-coding-tools
+ln -s ~/dev/agentic-coding-tools/skills/super-agent ~/.claude/skills/super-agent
 ```
 
 ## What's Included

@@ -1,0 +1,10 @@
+{
+  "name": "agentic-coding-tools",
+  "description": "Agentic coding toolkit: sub-agent orchestration, prompt synthesis, and browser automation for Claude Code",
+  "version": "1.0.0",
+  "author": {
+    "name": "TheSylvester",
+    "url": "https://github.com/TheSylvester"
+  },
+  "homepage": "https://github.com/TheSylvester/agentic-coding-tools"
+}

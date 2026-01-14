@@ -83,9 +83,9 @@ cp -r .cursor/commands/* ~/.cursor/commands/
 | `/pair-prompt-to` | Create pair-programming specs |
 | `/reflect` | Validate prompts before execution |
 
-### Agent Workflows (`.agent/workflows/`)
+### Gemini CLI Workflows (`.agent/workflows/`)
 
-Workflow definitions for Claude Code agent orchestration.
+Workflow definitions for Gemini CLI agent orchestration.
 
 | Workflow | Description |
 |----------|-------------|

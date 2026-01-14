@@ -67,32 +67,32 @@ ln -s ~/dev/agentic-coding-tools/skills/super-agent ~/.claude/skills/super-agent
 | `browser-qa` | Visual UI testing and verification via browser automation. |
 | `ui-clone` | Create pixel-perfect HTML/CSS/JS reproductions of websites. |
 
-### Cursor IDE Commands (`.cursor/commands/`)
+### Cross-Platform Ports
 
-Custom slash commands for Cursor IDE's Agent chat. Install globally:
+The same prompt synthesis tools are available for other AI coding assistants:
+
+#### Cursor IDE (`.cursor/commands/`)
+
+Ports of the Claude Code commands for Cursor's Agent chat. Install globally:
 
 ```bash
+mkdir -p ~/.cursor/commands
 cp -r .cursor/commands/* ~/.cursor/commands/
 # Restart Cursor or run "Developer: Reload Window"
 ```
 
-| Command | Description |
-|---------|-------------|
-| `/build-prompt-chain` | Transform monolithic prompts into phased chains |
-| `/handoff-prompt-to` | Synthesize implementation prompts |
-| `/pair-prompt-to` | Create pair-programming specs |
-| `/reflect` | Validate prompts before execution |
+Includes: `/build-prompt-chain`, `/handoff-prompt-to`, `/pair-prompt-to`, `/reflect`
 
-### Gemini CLI Workflows (`.agent/workflows/`)
+#### Gemini CLI (`.agent/workflows/`)
 
-Workflow definitions for Gemini CLI agent orchestration.
+Ports of the Claude Code commands for Gemini CLI. Copy to your Gemini config:
 
-| Workflow | Description |
-|----------|-------------|
-| `build-prompt-chain` | Multi-phase prompt decomposition workflow |
-| `handoff-prompt-to` | Handoff prompt synthesis workflow |
-| `pair-prompt-to` | Pair programming spec workflow |
-| `reflect` | Prompt validation workflow |
+```bash
+mkdir -p ~/.agent/workflows
+cp -r .agent/workflows/* ~/.agent/workflows/
+```
+
+Includes: `build-prompt-chain`, `handoff-prompt-to`, `pair-prompt-to`, `reflect`
 
 ## Key Workflows
 

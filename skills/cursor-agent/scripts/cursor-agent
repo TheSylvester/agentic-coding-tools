@@ -3,21 +3,21 @@
 #
 # Usage:
 #   cursor-agent <prompt>                         # Args as prompt
-#   cursor-agent --fork <prompt>                  # Resume existing chat via CHAT_ID/SESSION_ID
+#   cursor-agent --resume <id> <prompt>           # Resume existing chat
 #   PROMPT_FILE=task.md cursor-agent              # Read from file
 #   cat task.md | cursor-agent                    # Read from stdin
 #
 # Environment variables:
 #   PROMPT_FILE          - Read prompt from this file
 #   CURSOR_AGENT_MODEL   - Model to use (passed as --model)
-#   CHAT_ID              - Required for --fork (fallback: SESSION_ID)
+#   CURSOR_SESSION       - Session ID to resume (fallback: CHAT_ID, SESSION_ID)
 #
 # Pass-through flags: --force, --approve-mcps, --browser
 
 set -euo pipefail
 
 MODEL="${CURSOR_AGENT_MODEL:-}"
-FORK_MODE=false
+RESUME="${CURSOR_SESSION:-${CHAT_ID:-${SESSION_ID:-}}}"
 PASSTHRU_FORCE=false
 PASSTHRU_APPROVE_MCPS=false
 PASSTHRU_BROWSER=false
@@ -25,9 +25,9 @@ PASSTHRU_BROWSER=false
 # Parse flags
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --fork|-f)
-      FORK_MODE=true
-      shift
+    --resume|-r|--fork|-f)
+      RESUME="$2"
+      shift 2
       ;;
     --force)
       PASSTHRU_FORCE=true
@@ -54,13 +54,6 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-
-# Validate chat id if fork mode
-CHAT="${CHAT_ID:-${SESSION_ID:-}}"
-if [[ "$FORK_MODE" == "true" && -z "$CHAT" ]]; then
-  echo "Error: CHAT_ID (or SESSION_ID) required for --fork mode" >&2
-  exit 1
-fi
 
 # Determine prompt source: PROMPT_FILE > args > stdin
 if [[ -n "${PROMPT_FILE:-}" ]]; then
@@ -89,11 +82,36 @@ if ! command -v cursor-agent >/dev/null 2>&1; then
 fi
 
 # Build command args
-CURSOR_ARGS=(--print)
+CURSOR_ARGS=(--print --output-format json)
 [[ -n "$MODEL" ]] && CURSOR_ARGS+=(--model "$MODEL")
-[[ "$FORK_MODE" == "true" ]] && CURSOR_ARGS+=(--resume "$CHAT")
+[[ -n "$RESUME" ]] && CURSOR_ARGS+=(--resume "$RESUME")
 [[ "$PASSTHRU_FORCE" == "true" ]] && CURSOR_ARGS+=(--force)
 [[ "$PASSTHRU_APPROVE_MCPS" == "true" ]] && CURSOR_ARGS+=(--approve-mcps)
 [[ "$PASSTHRU_BROWSER" == "true" ]] && CURSOR_ARGS+=(--browser)
 
-exec cursor-agent "${CURSOR_ARGS[@]}" -- "$PROMPT"
+# Run and capture output
+OUTPUT=$(cursor-agent "${CURSOR_ARGS[@]}" -- "$PROMPT" 2>/dev/null)
+
+# Extract result and session_id from JSON
+if command -v jq >/dev/null 2>&1; then
+  RESPONSE=$(echo "$OUTPUT" | jq -r '.result // empty' 2>/dev/null)
+  SESSION_ID=$(echo "$OUTPUT" | jq -r '.session_id // empty' 2>/dev/null)
+else
+  # Fallback: basic extraction without jq
+  RESPONSE=$(echo "$OUTPUT" | grep -oP '"result"\s*:\s*"\K[^"]*' | head -1)
+  SESSION_ID=$(echo "$OUTPUT" | grep -oP '"session_id"\s*:\s*"\K[^"]*' | head -1)
+fi
+
+# Output response
+if [[ -n "$RESPONSE" ]]; then
+  echo "$RESPONSE"
+else
+  # If JSON parsing failed, output raw
+  echo "$OUTPUT"
+fi
+
+# Always output session ID for caller to capture
+if [[ -n "$SESSION_ID" ]]; then
+  echo ""
+  echo "[session_id: $SESSION_ID]"
+fi

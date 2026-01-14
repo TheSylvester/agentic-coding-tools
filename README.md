@@ -67,6 +67,33 @@ ln -s ~/dev/agentic-coding-tools/skills/super-agent ~/.claude/skills/super-agent
 | `browser-qa` | Visual UI testing and verification via browser automation. |
 | `ui-clone` | Create pixel-perfect HTML/CSS/JS reproductions of websites. |
 
+### Cursor IDE Commands (`.cursor/commands/`)
+
+Custom slash commands for Cursor IDE's Agent chat. Install globally:
+
+```bash
+cp -r .cursor/commands/* ~/.cursor/commands/
+# Restart Cursor or run "Developer: Reload Window"
+```
+
+| Command | Description |
+|---------|-------------|
+| `/build-prompt-chain` | Transform monolithic prompts into phased chains |
+| `/handoff-prompt-to` | Synthesize implementation prompts |
+| `/pair-prompt-to` | Create pair-programming specs |
+| `/reflect` | Validate prompts before execution |
+
+### Agent Workflows (`.agent/workflows/`)
+
+Workflow definitions for Claude Code agent orchestration.
+
+| Workflow | Description |
+|----------|-------------|
+| `build-prompt-chain` | Multi-phase prompt decomposition workflow |
+| `handoff-prompt-to` | Handoff prompt synthesis workflow |
+| `pair-prompt-to` | Pair programming spec workflow |
+| `reflect` | Prompt validation workflow |
+
 ## Key Workflows
 
 ### Handoff Pattern

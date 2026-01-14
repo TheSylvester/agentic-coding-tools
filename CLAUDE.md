@@ -1,4 +1,5 @@
 - Ignore README.md in this directory (it's for the marketplace, not instructions).
+- Ignore .cursor/ and .agent/ directories (cross-platform ports for Cursor IDE and Gemini CLI).
 - When generating .md files, always write to a '<project-root>/.ai-reference/' folder. Never add .md files to the repo.
 - After generating any markdown prompts/specs/task files: /reflect to refine the product file(s) against the existing context where it could help.
 - Default to researching, sharing insight, and planning. Take implementation actions only when asked.

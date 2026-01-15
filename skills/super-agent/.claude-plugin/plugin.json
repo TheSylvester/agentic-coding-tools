@@ -1,0 +1,8 @@
+{
+  "name": "super-agent",
+  "version": "1.0.0",
+  "description": "SDK-based Claude agent with full Task tool access. Use for executing handoff prompts or spawning nested sub-agents.",
+  "author": {
+    "name": "TheSylvester"
+  }
+}

@@ -1,10 +1,10 @@
 ---
-name: claude-in-chrome-image
-description: Extract and save claude-in-chrome screenshots from session transcripts
+name: chrome-screenshot
+description: Extract and save browser screenshots from session transcripts
 allowed-tools: Bash, Read
 ---
 
-# claude-in-chrome-image
+# chrome-screenshot
 
 Extract browser screenshots from Claude Code transcripts by their `ss_*` ID.
 
@@ -13,17 +13,17 @@ Screenshot IDs are returned when you take screenshots with claude-in-chrome tool
 ## Usage
 
 ```bash
-claude-in-chrome-image                              # List all screenshot IDs
-claude-in-chrome-image ss_abc123                    # Extract to stdout
-claude-in-chrome-image ss_abc123 file.jpg           # Save to file
-claude-in-chrome-image ss_abc123 file.jpg <session> # From specific session
+chrome-screenshot                              # List all screenshot IDs
+chrome-screenshot ss_abc123                    # Extract to stdout
+chrome-screenshot ss_abc123 file.jpg           # Save to file
+chrome-screenshot ss_abc123 file.jpg <session> # From specific session
 ```
 
 ## Save & View Pattern
 
 ```bash
 # Save screenshot to file
-claude-in-chrome-image ss_3669oma6t .ai-reference/screenshots/homepage.jpg
+chrome-screenshot ss_3669oma6t .ai-reference/screenshots/homepage.jpg
 
 # Then Read it to view
 Read .ai-reference/screenshots/homepage.jpg
@@ -34,8 +34,8 @@ Read .ai-reference/screenshots/homepage.jpg
 Save multiple screenshots, then Read them together:
 
 ```bash
-claude-in-chrome-image ss_abc123 .ai-reference/screenshots/before.jpg
-claude-in-chrome-image ss_def456 .ai-reference/screenshots/after.jpg
+chrome-screenshot ss_abc123 .ai-reference/screenshots/before.jpg
+chrome-screenshot ss_def456 .ai-reference/screenshots/after.jpg
 ```
 
 ```

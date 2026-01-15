@@ -9,3 +9,11 @@
   - **Exploration & filtering** to scout codebases or research topics, returning only relevant findings
   - **Focused analysis** in isolated context (single or parallel), then synthesizing conclusions in main thread
 - If you start a server and hit a port conflict, check `lsof -i :<port>`—if it's a prior instance of what you're starting, kill it and retry. Clean up any servers you start before session end.
+
+## Marketplace
+
+This repo IS the marketplace. See README.md "Development" section for full details.
+
+- Validate: `claude plugin validate .`
+- Symlink setup: `mkdir -p plugins/marketplaces && ln -s ../.. plugins/marketplaces/agentic-coding-tools`
+- Test: `/plugin`

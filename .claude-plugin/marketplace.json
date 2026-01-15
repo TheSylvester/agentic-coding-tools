@@ -1,10 +1,12 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "agentic-coding-tools",
-  "version": "1.0.0",
-  "description": "Agentic coding toolkit: sub-agent orchestration, prompt synthesis, and browser automation for Claude Code",
   "owner": {
     "name": "TheSylvester"
+  },
+  "metadata": {
+    "description": "Agentic coding toolkit: sub-agent orchestration, prompt synthesis, and browser automation for Claude Code",
+    "version": "1.0.0"
   },
   "plugins": [
     {
@@ -17,6 +19,76 @@
       "version": "1.0.0",
       "category": "development",
       "strict": false
+    },
+    {
+      "name": "super-agent",
+      "source": "./skills/super-agent",
+      "description": "SDK-based Claude agent with full Task tool access. Use for executing handoff prompts or spawning nested sub-agents.",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
+    },
+    {
+      "name": "cursor-agent",
+      "source": "./skills/cursor-agent",
+      "description": "Wrapper around cursor-agent CLI for non-interactive runs (prompt via args/file/stdin) with resume support.",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
+    },
+    {
+      "name": "gemini-agent",
+      "source": "./skills/gemini-agent",
+      "description": "Wrapper around gemini CLI for non-interactive runs (prompt via args/file/stdin) with resume support.",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
+    },
+    {
+      "name": "git-worktree",
+      "source": "./skills/git-worktree",
+      "description": "Create a git worktree with automatic symlinking of gitignored local files (.env*, .ai-*, etc.) from the root worktree.",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
+    },
+    {
+      "name": "build-prompt-chain",
+      "source": "./skills/build-prompt-chain",
+      "description": "Build a phased prompt chain with orchestration file from a monolithic implementation prompt.",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
+    },
+    {
+      "name": "chrome-screenshot",
+      "source": "./skills/chrome-screenshot",
+      "description": "Extract browser screenshots from session transcripts",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
+    },
+    {
+      "name": "read-transcript",
+      "source": "./skills/read-transcript",
+      "description": "Read Claude Code .jsonl transcript files in a token-efficient format. Use instead of Read for conversation content.",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
     }
   ]
 }

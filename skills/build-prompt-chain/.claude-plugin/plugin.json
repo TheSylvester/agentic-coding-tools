@@ -1,0 +1,8 @@
+{
+  "name": "build-prompt-chain",
+  "version": "1.0.0",
+  "description": "Build a phased prompt chain with orchestration file from a monolithic implementation prompt.",
+  "author": {
+    "name": "TheSylvester"
+  }
+}

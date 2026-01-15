@@ -1,0 +1,8 @@
+{
+  "name": "cursor-agent",
+  "version": "1.0.0",
+  "description": "Wrapper around cursor-agent CLI for non-interactive runs (prompt via args/file/stdin) with resume support.",
+  "author": {
+    "name": "TheSylvester"
+  }
+}

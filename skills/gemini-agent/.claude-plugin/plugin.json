@@ -1,0 +1,8 @@
+{
+  "name": "gemini-agent",
+  "version": "1.0.0",
+  "description": "Wrapper around gemini CLI for non-interactive runs (prompt via args/file/stdin) with resume support.",
+  "author": {
+    "name": "TheSylvester"
+  }
+}

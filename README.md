@@ -1,31 +1,48 @@
 # Agentic Coding Tools
 
-A Claude Code plugin marketplace for sub-agent orchestration, prompt synthesis, and browser automation.
+Stop losing context when Claude hits limits. Hand off tasks to fresh agents with full specs automatically synthesized from your conversation.
+
+## Quick Example
+
+```
+You: "Build the auth system we discussed"
+/handoff-prompt-to super-agent
+
+→ Synthesizes a complete implementation spec from conversation context
+→ Spawns a fresh agent with the spec
+→ Agent executes with full context, no token debt
+```
 
 ## Installation
-
-### Install Everything
 
 ```bash
 /plugin marketplace add TheSylvester/agentic-coding-tools
 /plugin install agentic-coding-tools
 ```
 
-### Install Individual Skills
-
-Skills are individually installable from the marketplace:
-
+Or install individual skills:
 ```bash
-/plugin marketplace add TheSylvester/agentic-coding-tools
-/plugin install super-agent      # Just this skill
-/plugin install chrome-screenshot # Or this one
+/plugin install super-agent
+/plugin install chrome-screenshot
 ```
 
-Or clone and symlink:
-```bash
-git clone https://github.com/TheSylvester/agentic-coding-tools.git ~/dev/agentic-coding-tools
-ln -s ~/dev/agentic-coding-tools/skills/super-agent ~/.claude/skills/super-agent
-```
+## Core Workflows
+
+### Handoff Pattern
+When context gets heavy, synthesize a prompt and hand off to a fresh agent:
+- `/handoff-prompt-to super-agent` — Full spec, fresh execution
+- `/pair-prompt-to super-agent` — Collaborative pair-programming mode
+- `/reflect` — Validate your prompts before execution
+
+### Phased Execution
+For large tasks that exceed single-agent capacity:
+- `/build-prompt-chain` — Decompose into phases with orchestration file
+- Execute each phase with `/super-agent`
+
+### Browser Automation
+- `browser-qa` agent — Visual UI testing and verification
+- `ui-clone` agent — Pixel-perfect HTML/CSS reproductions
+- `/chrome-screenshot` — Extract screenshots from session transcripts
 
 ## What's Included
 
@@ -33,65 +50,45 @@ ln -s ~/dev/agentic-coding-tools/skills/super-agent ~/.claude/skills/super-agent
 
 | Skill | Description |
 |-------|-------------|
-| `super-agent` | SDK-based Claude agent with full Task tool access. Use for executing handoff prompts or spawning nested sub-agents. |
-| `cursor-agent` | Wrapper around cursor-agent CLI for non-interactive runs with resume support. |
-| `gemini-agent` | Wrapper around gemini CLI for non-interactive runs with resume support. |
-| `build-prompt-chain` | Transform monolithic prompts into phased chains for sustained-context execution. |
-| `read-transcript` | Read Claude Code .jsonl transcripts in a token-efficient format. |
-| `chrome-screenshot` | Extract and save browser screenshots from Claude Code transcripts. |
-| `git-worktree` | Create git worktrees with automatic symlinking of gitignored local files (.env*, .ai-*, etc.). |
+| `super-agent` | SDK-based Claude agent with full Task tool access |
+| `cursor-agent` | Cursor IDE agent wrapper with resume support |
+| `gemini-agent` | Gemini CLI wrapper with resume support |
+| `git-worktree` | Create worktrees with auto-symlinked local files (.env*, .ai-*) |
+| `build-prompt-chain` | Transform monolithic prompts into phased chains |
+| `chrome-screenshot` | Extract browser screenshots from transcripts |
+| `read-transcript` | Token-efficient transcript reading |
 
-### Commands (Prompt Synthesis)
+### Commands
 
 | Command | Description |
 |---------|-------------|
-| `/handoff-prompt-to` | Synthesize implementation prompts for a fresh agent. Auto-decomposes if task is too large. |
-| `/pair-prompt-to` | Create a complete spec for pair-programming with a new agent. |
-| `/reflect` | Validate prompts against conversation + codebase before execution. |
-| `/walkthrough-prompt-to` | Generate guided walkthrough prompts. |
+| `/handoff-prompt-to` | Synthesize implementation prompts for fresh agents |
+| `/pair-prompt-to` | Create specs for pair-programming sessions |
+| `/walkthrough-prompt-to` | Generate design walkthrough prompts |
+| `/reflect` | Validate prompts against conversation + codebase |
 
-### Agents (Task Specialists)
+### Agents
 
 | Agent | Description |
 |-------|-------------|
-| `browser-qa` | Visual UI testing and verification via browser automation. |
-| `ui-clone` | Create pixel-perfect HTML/CSS/JS reproductions of websites. |
+| `browser-qa` | Visual UI testing via browser automation |
+| `ui-clone` | Pixel-perfect website reproduction |
 
-### Cross-Platform Ports
+## Cross-Platform
 
-The same prompt synthesis tools are available for other AI coding assistants:
+Same prompt synthesis tools for other AI assistants:
 
-#### Cursor IDE (`.cursor/commands/`)
-
-```bash
-mkdir -p ~/.cursor/commands
-cp -r .cursor/commands/* ~/.cursor/commands/
-# Restart Cursor or run "Developer: Reload Window"
-```
-
-#### Gemini CLI (`.agent/workflows/`)
-
-```bash
-mkdir -p ~/.agent/workflows
-cp -r .agent/workflows/* ~/.agent/workflows/
-```
-
-## Key Workflows
-
-### Handoff Pattern
-Use `/handoff-prompt-to` to synthesize a prompt, then `/super-agent` to execute it in a fresh context.
-
-### Phased Execution
-Use `/build-prompt-chain` to decompose large tasks into phases, then execute each phase with `/super-agent`.
-
-### UI Work
-Use `browser-qa` for testing flows and `ui-clone` for reproducing designs.
+| Platform | Setup |
+|----------|-------|
+| Cursor IDE | `cp -r .cursor/commands/* ~/.cursor/commands/` |
+| Gemini CLI | `cp -r .agent/workflows/* ~/.agent/workflows/` |
 
 ---
 
-## Development
+<details>
+<summary><strong>Development</strong></summary>
 
-This repo serves dual purpose: it's both a Claude Code config directory AND a marketplace source.
+This repo is both a Claude Code config directory AND a marketplace source.
 
 ### Structure
 
@@ -112,22 +109,7 @@ This repo serves dual purpose: it's both a Claude Code config directory AND a ma
         └── agentic-coding-tools → ../.. (symlink to root)
 ```
 
-### How the Symlink Works
-
-Claude Code looks for marketplaces in `~/.claude/plugins/marketplaces/*/`. The symlink makes the repo root appear there:
-
-```
-plugins/marketplaces/agentic-coding-tools → ../..
-```
-
-This way:
-- Claude Code finds the marketplace via the symlink
-- All actual files live at root (tracked by git)
-- `plugins/` stays gitignored (for external installed plugins)
-
-### Local Development Setup
-
-If using this repo as your `~/.claude/`:
+### Local Setup
 
 ```bash
 # One-time symlink setup
@@ -135,46 +117,15 @@ mkdir -p plugins/marketplaces
 ln -s ../.. plugins/marketplaces/agentic-coding-tools
 ```
 
-### Adding a New Skill
+### Adding a Skill
 
-1. Create `skills/<name>/SKILL.md` with YAML frontmatter:
-   ```yaml
-   ---
-   name: skill-name
-   description: What it does
-   allowed-tools: Bash, Read
-   ---
-   ```
-
-2. Add `skills/<name>/.claude-plugin/plugin.json`:
-   ```json
-   {
-     "name": "skill-name",
-     "version": "1.0.0",
-     "description": "What it does",
-     "author": { "name": "YourName" }
-   }
-   ```
-
+1. Create `skills/<name>/SKILL.md` with YAML frontmatter
+2. Add `skills/<name>/.claude-plugin/plugin.json`
 3. Add executable to `skills/<name>/scripts/<name>` (if needed)
+4. Add entry to `.claude-plugin/marketplace.json`
+5. Validate: `claude plugin validate .`
 
-4. Add entry to `.claude-plugin/marketplace.json`:
-   ```json
-   {
-     "name": "skill-name",
-     "source": "./skills/skill-name",
-     "description": "What it does",
-     "version": "1.0.0",
-     "category": "development",
-     "author": { "name": "YourName" }
-   }
-   ```
-
-5. Validate and test:
-   ```bash
-   claude plugin validate .
-   /plugin  # Check it appears
-   ```
+</details>
 
 ## License
 

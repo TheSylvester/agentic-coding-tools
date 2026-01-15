@@ -41,7 +41,7 @@ ln -s ~/dev/agentic-coding-tools/skills/super-agent ~/.claude/skills/super-agent
 
 ## What's Included
 
-### Skills (Sub-agent Wrappers)
+### Skills
 
 | Skill | Description |
 |-------|-------------|
@@ -50,6 +50,8 @@ ln -s ~/dev/agentic-coding-tools/skills/super-agent ~/.claude/skills/super-agent
 | `gemini-agent` | Wrapper around gemini CLI for non-interactive runs. |
 | `build-prompt-chain` | Transform monolithic prompts into phased chains for sustained-context execution. |
 | `read-transcript` | Read Claude Code .jsonl transcripts in a token-efficient format. |
+| `save-transcript-screenshots` | Extract and save browser screenshots from Claude Code transcripts to disk. Works with MCP browser automation. |
+| `git-worktree` | Create git worktrees with automatic symlinking of gitignored local files (.env*, .ai-*, etc.). |
 
 ### Commands (Prompt Synthesis)
 
@@ -64,7 +66,7 @@ ln -s ~/dev/agentic-coding-tools/skills/super-agent ~/.claude/skills/super-agent
 
 | Agent | Description |
 |-------|-------------|
-| `browser-qa` | Visual UI testing and verification via browser automation. |
+| `browser-qa` | Visual UI testing and verification via browser automation. Auto-saves screenshots using `save-transcript-screenshots`. |
 | `ui-clone` | Create pixel-perfect HTML/CSS/JS reproductions of websites. |
 
 ### Cross-Platform Ports

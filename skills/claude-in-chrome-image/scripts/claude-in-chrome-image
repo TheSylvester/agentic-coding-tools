@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+#
+# claude-in-chrome-image - Extract screenshots from Claude Code transcripts
+#
+# Usage:
+#   claude-in-chrome-image                              # List screenshot IDs
+#   claude-in-chrome-image <id>                         # Extract to stdout
+#   claude-in-chrome-image <id> <file.jpg>              # Save to file (Claude can Read it)
+#   claude-in-chrome-image <id> <file.jpg> <sessionId>  # Save from specific session
+#   claude-in-chrome-image <id> <sessionId>             # Extract from specific session to stdout
+#
+# When saving to file, outputs the file path so Claude can Read it.
+#
+
+set -eu
+
+get_session() {
+  local proj=$(pwd -P | sed 's|[/.]|-|g')
+  basename "$(ls -t ~/.claude/projects/${proj}/*.jsonl 2>/dev/null | head -1)" .jsonl
+}
+
+is_filename() {
+  [[ "$1" == *.jpg || "$1" == *.jpeg || "$1" == *.png || "$1" == *.gif ]]
+}
+
+# Parse args: <imageId> [file.jpg] [sessionId]
+imageId="${1:-}"
+output=""
+sessionId=""
+
+if [[ -n "${2:-}" ]]; then
+  if is_filename "$2"; then
+    output="$2"
+    sessionId="${3:-$(get_session)}"
+  else
+    sessionId="$2"
+  fi
+else
+  sessionId="$(get_session)"
+fi
+
+base=$(find ~/.claude/projects -name "${sessionId}.jsonl" -print -quit)
+dir="${base%.jsonl}"
+
+[[ -z "$base" ]] && { echo "Session not found" >&2; exit 1; }
+
+# List mode (no imageId or --list flag)
+if [[ -z "$imageId" || "$imageId" == "--list" || "$imageId" == "-l" ]]; then
+  grep -ohE 'ss_[a-z0-9]+' "$base" "$dir"/subagents/*.jsonl 2>/dev/null | sort -u
+  exit 0
+fi
+
+# Extract mode
+for f in "$base" "$dir"/subagents/*.jsonl; do
+  [[ -f "$f" ]] || continue
+  data=$(grep "$imageId" "$f" 2>/dev/null | grep '"type":"image"' | head -1 | \
+    jq -r '.. | select(.type? == "image") | .source.data' 2>/dev/null | head -1)
+  if [[ -n "$data" ]]; then
+    if [[ -n "$output" ]]; then
+      # Save to file mode - create dir if needed, save, output path
+      mkdir -p "$(dirname "$output")" 2>/dev/null || true
+      echo "$data" | base64 -d > "$output"
+      echo "Saved: $output"
+    else
+      # Stdout mode
+      echo "$data" | base64 -d
+    fi
+    exit 0
+  fi
+done
+
+echo "Image $imageId not found" >&2
+exit 1

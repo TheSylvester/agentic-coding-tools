@@ -1,0 +1,8 @@
+{
+  "name": "claude-in-chrome-image",
+  "version": "1.0.0",
+  "description": "Extract claude-in-chrome screenshots from session transcripts",
+  "author": {
+    "name": "TheSylvester"
+  }
+}

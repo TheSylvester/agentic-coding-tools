@@ -9,7 +9,10 @@
   "plugins": [
     {
       "name": "agentic-coding-tools",
-      "source": ".",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/TheSylvester/agentic-coding-tools.git"
+      },
       "description": "Complete agentic coding toolkit with skills for sub-agent orchestration (super-agent, cursor-agent, gemini-agent), prompt synthesis commands (handoff-prompt-to, pair-prompt-to, reflect, walkthrough-prompt-to), and specialized agents (browser-qa, ui-clone)",
       "version": "1.0.0",
       "category": "development",

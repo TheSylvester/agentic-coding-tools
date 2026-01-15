@@ -3,6 +3,7 @@
 - When generating .md files, always write to a '<project-root>/.ai-reference/' folder. Never add .md files to the repo.
 - After generating any markdown prompts/specs/task files: /reflect to refine the product file(s) against the existing context where it could help.
 - Default to researching, sharing insight, and planning. Take implementation actions only when asked.
+- When I say "lsa to" it means "launch a sub-agent to", and when I say "lpsa to" it means "launch parallel sub-agents to".
 - ALWAYS use sub-agents where possible for:
   - **Parallel execution** of independent tasks (multi-file analysis, concurrent tests/builds)
   - **Exploration & filtering** to scout codebases or research topics, returning only relevant findings

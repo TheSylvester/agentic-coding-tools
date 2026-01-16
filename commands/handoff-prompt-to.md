@@ -129,7 +129,7 @@ Add to section 7 (Definition of Done):
 
 ## Output
 
-- **Single prompt**: Save to `.ai-reference/prompts/<timestamp>-<task-description>.md`
+- **Single prompt**: Save to `.ai-reference/prompts/YYYYMMDD-HHMMSS-<task-description>.md` (e.g., `20250115-143022-refactor-auth.md`)
 - **Multiple prompts**: Save to `.ai-reference/prompts/<task-name>/` directory
 - **No title header**: Start directly with the Task section - do NOT add "# Handoff Prompt" or similar titles
 

@@ -21,6 +21,7 @@ You: "Build the auth system we discussed"
 ```
 
 Or install individual skills:
+
 ```bash
 /plugin install super-agent
 /plugin install chrome-screenshot
@@ -29,17 +30,22 @@ Or install individual skills:
 ## Core Workflows
 
 ### Handoff Pattern
+
 When context gets heavy, synthesize a prompt and hand off to a fresh agent:
+
 - `/handoff-prompt-to super-agent` — Full spec, fresh execution
 - `/pair-prompt-to super-agent` — Collaborative pair-programming mode
 - `/reflect` — Validate your prompts before execution
 
 ### Phased Execution
+
 For large tasks that exceed single-agent capacity:
+
 - `/build-prompt-chain` — Decompose into phases with orchestration file
 - Execute each phase with `/super-agent`
 
 ### Browser Automation
+
 - `browser-qa` agent — Visual UI testing and verification
 - `ui-clone` agent — Pixel-perfect HTML/CSS reproductions
 - `/chrome-screenshot` — Extract screenshots from session transcripts
@@ -48,38 +54,38 @@ For large tasks that exceed single-agent capacity:
 
 ### Skills
 
-| Skill | Description |
-|-------|-------------|
-| `super-agent` | SDK-based Claude agent with full Task tool access |
-| `cursor-agent` | Cursor IDE agent wrapper with resume support |
-| `gemini-agent` | Gemini CLI wrapper with resume support |
-| `git-worktree` | Create worktrees with auto-symlinked local files (.env*, .ai-*) |
-| `build-prompt-chain` | Transform monolithic prompts into phased chains |
-| `chrome-screenshot` | Extract browser screenshots from transcripts |
-| `read-transcript` | Token-efficient transcript reading |
+| Skill                | Description                                                     |
+| -------------------- | --------------------------------------------------------------- |
+| `super-agent`        | SDK-based Claude agent with full Task tool access               |
+| `cursor-agent`       | Cursor IDE agent wrapper with resume support                    |
+| `gemini-agent`       | Gemini CLI wrapper with resume support                          |
+| `git-worktree`       | Create worktrees with auto-symlinked local files (.env*, .ai-*) |
+| `build-prompt-chain` | Transform monolithic prompts into phased chains                 |
+| `chrome-screenshot`  | Extract browser screenshots from transcripts                    |
+| `read-transcript`    | Token-efficient transcript reading                              |
 
 ### Commands
 
-| Command | Description |
-|---------|-------------|
-| `/handoff-prompt-to` | Synthesize implementation prompts for fresh agents |
-| `/pair-prompt-to` | Create specs for pair-programming sessions |
-| `/walkthrough-prompt-to` | Generate design walkthrough prompts |
-| `/reflect` | Validate prompts against conversation + codebase |
+| Command                  | Description                                        |
+| ------------------------ | -------------------------------------------------- |
+| `/handoff-prompt-to`     | Synthesize implementation prompts for fresh agents |
+| `/pair-prompt-to`        | Create specs for pair-programming sessions         |
+| `/walkthrough-prompt-to` | Generate design walkthrough prompts                |
+| `/reflect`               | Validate prompts against conversation + codebase   |
 
 ### Agents
 
-| Agent | Description |
-|-------|-------------|
+| Agent        | Description                              |
+| ------------ | ---------------------------------------- |
 | `browser-qa` | Visual UI testing via browser automation |
-| `ui-clone` | Pixel-perfect website reproduction |
+| `ui-clone`   | Pixel-perfect website reproduction       |
 
 ## Cross-Platform
 
 Same prompt synthesis tools for other AI assistants:
 
-| Platform | Setup |
-|----------|-------|
+| Platform   | Setup                                          |
+| ---------- | ---------------------------------------------- |
 | Cursor IDE | `cp -r .cursor/commands/* ~/.cursor/commands/` |
 | Gemini CLI | `cp -r .agent/workflows/* ~/.agent/workflows/` |
 
@@ -126,6 +132,14 @@ ln -s ../.. plugins/marketplaces/agentic-coding-tools
 5. Validate: `claude plugin validate .`
 
 </details>
+
+## Marketplace
+
+This repo IS the marketplace.
+
+- Validate: `claude plugin validate .`
+- Symlink setup: `mkdir -p plugins/marketplaces && ln -s ../.. plugins/marketplaces/agentic-coding-tools`
+- Test: `/plugin`
 
 ## License
 

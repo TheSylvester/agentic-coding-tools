@@ -1,12 +1,35 @@
 ---
 name: read-transcript
-description: Read Claude Code .jsonl transcript files in a token-efficient format. Use this instead of Read when you need the conversation content from a transcript, not the raw JSONL structure. Extracts USER/ASSISTANT exchanges and tool summaries, strips metadata.
+description: ALWAYS use this skill instead of Read when reading Claude Code transcript files (.jsonl in ~/.claude/projects/, ~/.claude/history.jsonl, or paths containing 'transcript'). Token-efficient format that extracts USER/ASSISTANT exchanges and tool summaries, strips metadata.
 allowed-tools: Bash
 ---
 
 # Read Transcript
 
 Token-efficient reader for Claude Code `.jsonl` transcript files. Strips metadata, extracts conversation flow.
+
+## Auto-Trigger Conditions
+
+**CRITICAL**: Use this skill AUTOMATICALLY instead of Read for any transcript files.
+
+**File Patterns:**
+- `~/.claude/projects/*/<UUID>.jsonl` - main session transcripts
+- `~/.claude/projects/*/agent-*.jsonl` - sub-agent transcripts (at project root)
+- `~/.claude/projects/*/<UUID>/subagents/agent-*.jsonl` - nested sub-agent transcripts
+- `~/.claude/history.jsonl` - ⚠️ command history (different format, not supported)
+- `*/diffs/*/transcript_cycle.jsonl` - transcript cycle files
+- Any `.jsonl` when context suggests Claude Code conversation
+
+**User Phrases:**
+- "read/analyze this transcript"
+- "what happened in this session"
+- "review this Claude Code session"
+- "find a transcript" / "find me a transcript"
+
+**Only use Read directly if:**
+- User explicitly needs raw JSONL structure
+- Debugging format issues
+- Inspecting specific metadata fields
 
 ## Usage
 
@@ -39,6 +62,11 @@ python .claude/skills/read-transcript/scripts/jsonl-to-readable.py transcript.js
 
 ## When to Use
 
+**Auto-trigger on:**
+- Any `.jsonl` file in `~/.claude/projects/`
+- User mentions "transcript", "session", or "conversation history"
+
+**Also useful for:**
 - Analyzing what happened in a Claude Code session
 - Reviewing conversation flow without metadata clutter
 - Extracting content from transcripts for documentation

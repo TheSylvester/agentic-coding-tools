@@ -35,19 +35,22 @@ Token-efficient reader for Claude Code `.jsonl` transcript files. Strips metadat
 
 ```bash
 # Basic - outputs to stdout
-python .claude/skills/read-transcript/scripts/jsonl-to-readable.py /path/to/transcript.jsonl
+.claude/skills/read-transcript/scripts/read-transcript /path/to/transcript.jsonl
 
 # With metadata header (dir, branch, timestamps, entry count)
-python .claude/skills/read-transcript/scripts/jsonl-to-readable.py transcript.jsonl --summary
+.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --summary
 
 # Text only (no tool calls)
-python .claude/skills/read-transcript/scripts/jsonl-to-readable.py transcript.jsonl --no-tools
+.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --no-tools
 
 # Compact format
-python .claude/skills/read-transcript/scripts/jsonl-to-readable.py transcript.jsonl --compact
+.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --compact
 
 # Include sub-agent transcripts inline
-python .claude/skills/read-transcript/scripts/jsonl-to-readable.py transcript.jsonl --inline-subagents
+.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --inline-subagents
+
+# Pagination (like Read tool's offset/limit)
+.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --offset 10 --limit 5
 ```
 
 ## Options
@@ -59,6 +62,8 @@ python .claude/skills/read-transcript/scripts/jsonl-to-readable.py transcript.js
 | `--compact` | Denser output format |
 | `--inline-subagents` | Recursively inline sub-agent transcripts |
 | `--thinking` | Include thinking blocks (usually skip to save tokens) |
+| `--offset N` | Skip first N entries (0-based, like Read tool) |
+| `--limit N` | Return only N entries (like Read tool)
 
 ## When to Use
 
@@ -72,8 +77,20 @@ python .claude/skills/read-transcript/scripts/jsonl-to-readable.py transcript.js
 - Extracting content from transcripts for documentation
 - Summarizing or understanding transcript content
 
+## Pagination
+
+Supports Read-like pagination for large transcripts:
+
+```bash
+# Entries 10-14 (0-based indexing)
+.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --offset 10 --limit 5 --summary
+# Output: "Entries: 5 (showing 10-14 of 745)"
+```
+
+Use `--summary` with pagination to see the range displayed.
+
 ## When NOT to Use
 
 - Debugging JSONL format issues (use Read directly)
 - Inspecting specific metadata fields (sessionId, tokens, etc.)
-- When user explicitly wants raw structure
+- When user explicitly wants raw JSON structure

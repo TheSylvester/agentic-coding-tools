@@ -14,6 +14,8 @@ Options:
     --thinking          Include thinking blocks (usually skip to save tokens)
     --compact           Denser output format
     --inline-subagents  Recursively inline sub-agent transcripts
+    --offset N          Skip first N entries (0-based)
+    --limit N           Return only N entries
 """
 
 import json
@@ -280,6 +282,8 @@ def process_file(
     compact: bool = False,
     inline_subagents: bool = False,
     indent_level: int = 0,
+    offset: int = 0,
+    limit: Optional[int] = None,
 ) -> str:
     """Process a single JSONL file to readable format."""
     entries = []
@@ -307,6 +311,12 @@ def process_file(
             except json.JSONDecodeError:
                 continue
 
+    # Apply pagination
+    total_entries = len(entries)
+    if offset or limit:
+        end = offset + limit if limit else None
+        entries = entries[offset:end]
+
     output_lines = []
 
     # Summary header
@@ -330,7 +340,10 @@ def process_file(
                 output_lines.append(f"{indent_str}Started: {format_timestamp(first_ts)}")
             if last_ts:
                 output_lines.append(f"{indent_str}Ended: {format_timestamp(last_ts)}")
-        output_lines.append(f"{indent_str}Entries: {len(entries)}")
+        if offset or limit:
+            output_lines.append(f"{indent_str}Entries: {len(entries)} (showing {offset}-{offset + len(entries) - 1} of {total_entries})")
+        else:
+            output_lines.append(f"{indent_str}Entries: {len(entries)}")
         output_lines.append("")
 
     # Process entries
@@ -361,6 +374,7 @@ Examples:
   %(prog)s transcript.jsonl --no-tools       # Text exchanges only
   %(prog)s transcript.jsonl --compact        # Denser output
   %(prog)s transcript.jsonl --inline-subagents  # Include sub-agent transcripts
+  %(prog)s transcript.jsonl --offset 10 --limit 5  # Entries 10-14 only
         """,
     )
 
@@ -379,6 +393,12 @@ Examples:
     )
     parser.add_argument(
         "--inline-subagents", action="store_true", help="Recursively inline sub-agent transcripts"
+    )
+    parser.add_argument(
+        "--offset", type=int, default=0, help="Skip first N entries (0-based)"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Return only N entries"
     )
 
     args = parser.parse_args()
@@ -408,6 +428,8 @@ Examples:
         include_thinking=args.thinking,
         compact=args.compact,
         inline_subagents=args.inline_subagents,
+        offset=args.offset,
+        limit=args.limit,
     )
 
     print(result)

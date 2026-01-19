@@ -47,3 +47,6 @@ Thumbs.db
 
 # Nested git repos
 skills/codex/.git/
+
+# cache
+leto-cache/

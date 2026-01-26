@@ -1,8 +1,0 @@
-{
-  "name": "git-worktree",
-  "version": "1.0.0",
-  "description": "Create a git worktree with automatic symlinking of gitignored local files (.env*, .ai-*, etc.) from the root worktree.",
-  "author": {
-    "name": "TheSylvester"
-  }
-}

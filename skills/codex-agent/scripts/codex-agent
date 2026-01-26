@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+# codex-agent: Non-interactive Codex CLI wrapper.
+#
+# Usage:
+#   codex-agent <prompt>                         # Args as prompt
+#   codex-agent --model <model> <prompt>         # Specify model
+#   codex-agent --resume latest <prompt>         # Resume latest session
+#   codex-agent --resume <UUID> <prompt>         # Resume session by UUID
+#   codex-agent --version                        # Show version diagnostics
+#   PROMPT_FILE=task.md codex-agent              # Read from file
+#   cat task.md | codex-agent                    # Read from stdin
+#
+# Environment variables:
+#   PROMPT_FILE          - Read prompt from this file
+#   CODEX_MODEL          - Model to use (passed as --model)
+#   CODEX_SESSION        - Session to resume ("latest" or UUID)
+#   OPENAI_API_KEY       - API key (alternative to OAuth login)
+#   CODEX_API_KEY        - API key for exec mode
+
+set -euo pipefail
+
+MIN_VERSION="0.80.0"
+
+# Version comparison: returns 0 if $1 >= $2
+version_gte() {
+  printf '%s\n%s\n' "$2" "$1" | sort -V -C
+}
+
+# Show version diagnostics
+show_diagnostics() {
+  echo "" >&2
+  echo "=== Diagnostics ===" >&2
+
+  if ! command -v codex >/dev/null 2>&1; then
+    echo "codex CLI: NOT INSTALLED" >&2
+    echo "  Install with: npm install -g @openai/codex" >&2
+    return
+  fi
+
+  local version
+  version=$(codex --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+  echo "codex CLI: v${version} (at $(command -v codex))" >&2
+  echo "  Min required: v${MIN_VERSION}" >&2
+
+  if [[ "$version" != "unknown" ]] && ! version_gte "$version" "$MIN_VERSION"; then
+    echo "  WARNING: Version too old! Run: npm install -g @openai/codex@latest" >&2
+  fi
+
+  echo "" >&2
+  echo "Authentication:" >&2
+  [[ -n "${OPENAI_API_KEY:-}" ]] && echo "  OPENAI_API_KEY: set" >&2 || echo "  OPENAI_API_KEY: not set" >&2
+  [[ -n "${CODEX_API_KEY:-}" ]] && echo "  CODEX_API_KEY: set" >&2 || echo "  CODEX_API_KEY: not set" >&2
+  [[ -s "${HOME}/.codex/auth.json" ]] && echo "  OAuth login: ~/.codex/auth.json (exists)" >&2 || echo "  OAuth login: ~/.codex/auth.json (missing)" >&2
+
+  echo "" >&2
+  echo "Effective auth: " >&2
+  if [[ -n "${CODEX_API_KEY:-}" ]]; then
+    echo "  CODEX_API_KEY env var" >&2
+  elif [[ -n "${OPENAI_API_KEY:-}" ]]; then
+    echo "  OPENAI_API_KEY env var" >&2
+  elif [[ -s "${HOME}/.codex/auth.json" ]]; then
+    echo "  OAuth login (ChatGPT)" >&2
+  else
+    echo "  NONE - run 'codex login' to authenticate" >&2
+  fi
+}
+
+MODEL="${CODEX_MODEL:-}"
+RESUME="${CODEX_SESSION:-}"
+SHOW_VERSION=false
+
+# Parse flags
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --version|-v)
+      SHOW_VERSION=true
+      shift
+      ;;
+    --model|-m)
+      MODEL="$2"
+      shift 2
+      ;;
+    --resume|-r)
+      RESUME="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+# If --version flag, show diagnostics and exit
+if [[ "$SHOW_VERSION" == "true" ]]; then
+  echo "codex-agent wrapper"
+  show_diagnostics 2>&1  # redirect to stdout for --version
+  exit 0
+fi
+
+# Determine prompt source: PROMPT_FILE > args > stdin
+HAS_STDIN=false
+[[ ! -t 0 ]] && HAS_STDIN=true
+
+if [[ -n "${PROMPT_FILE:-}" ]]; then
+  PROMPT="$(cat "$PROMPT_FILE")"
+elif [[ $# -gt 0 ]]; then
+  PROMPT="$*"
+elif [[ "$HAS_STDIN" == "true" ]]; then
+  PROMPT="$(cat || true)"
+else
+  echo "Usage: codex-agent [--model <model>] [--resume latest|<UUID>] <prompt>" >&2
+  echo "       codex-agent --version" >&2
+  echo "       PROMPT_FILE=task.md codex-agent" >&2
+  echo "       cat task.md | codex-agent" >&2
+  exit 1
+fi
+
+# Validate prompt
+if [[ -z "${PROMPT//[$' \t\r\n']/}" ]]; then
+  echo "Error: prompt is empty" >&2
+  exit 1
+fi
+
+# Verify codex command exists
+if ! command -v codex >/dev/null 2>&1; then
+  echo "Error: codex command not found. Install with: npm install -g @openai/codex" >&2
+  show_diagnostics
+  exit 1
+fi
+
+# Check authentication
+if [[ -z "${OPENAI_API_KEY:-}" && -z "${CODEX_API_KEY:-}" && ! -s "${HOME}/.codex/auth.json" ]]; then
+  echo "Error: No authentication configured." >&2
+  show_diagnostics
+  exit 1
+fi
+
+# Build command
+if [[ -n "$RESUME" ]]; then
+  # Resume mode
+  CODEX_CMD=(codex exec resume --dangerously-bypass-approvals-and-sandbox)
+  [[ -n "$MODEL" ]] && CODEX_CMD+=(-m "$MODEL")
+
+  if [[ "$RESUME" == "latest" ]]; then
+    CODEX_CMD+=(--last)
+  else
+    CODEX_CMD+=("$RESUME")
+  fi
+  CODEX_CMD+=("$PROMPT")
+else
+  # New session mode
+  CODEX_CMD=(codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check)
+  [[ -n "$MODEL" ]] && CODEX_CMD+=(-m "$MODEL")
+  CODEX_CMD+=("$PROMPT")
+fi
+
+# Run codex, show diagnostics on failure
+OUTPUT=$("${CODEX_CMD[@]}" 2>&1) || {
+  EXIT_CODE=$?
+  echo "$OUTPUT" >&2
+  show_diagnostics
+  exit $EXIT_CODE
+}
+
+# Extract session ID from output
+SESSION_ID=$(echo "$OUTPUT" | grep -oP 'session id: \K[0-9a-f-]+' | head -1)
+
+# Extract just the final response (after "tokens used" line, skip the token count number)
+# The output format is: header... thinking... codex\n<response>\ntokens used\n<number>\n<response again>
+CLEAN_OUTPUT=$(echo "$OUTPUT" | awk '
+  /^tokens used$/ { capture=1; next }
+  capture && /^[0-9,]+$/ { next }  # skip token count number
+  capture { print }
+')
+
+if [[ -n "$CLEAN_OUTPUT" ]]; then
+  echo "$CLEAN_OUTPUT"
+else
+  # Fallback to full output if parsing fails
+  echo "$OUTPUT"
+fi
+
+# Output session ID for caller to capture
+if [[ -n "$SESSION_ID" ]]; then
+  echo ""
+  echo "[session_id: $SESSION_ID]"
+fi

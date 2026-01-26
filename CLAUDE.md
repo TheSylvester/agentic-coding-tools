@@ -1,5 +1,6 @@
 ## Important Rules You MUST Follow:
 
+- When entering plan mode, **YOU MUST ALWAYS** first invoke the `planning-guide` skill to load planning methodology.
 - Before leaving plan mode, **YOU MUST ALWAYS** use the `reflect` skill to ensure the plan is complete and accurate.
 
 - When I say "lsa to" it means "launch a sub-agent to", and when I say "lpsa to" it means "launch parallel sub-agents to".

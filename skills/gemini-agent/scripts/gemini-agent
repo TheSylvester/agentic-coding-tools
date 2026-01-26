@@ -4,24 +4,81 @@
 # Usage:
 #   gemini-agent <prompt>                         # Args as prompt
 #   gemini-agent --model <model> <prompt>         # Specify model
-#   gemini-agent --resume <id> <prompt>           # Resume session
+#   gemini-agent --resume latest <prompt>         # Resume latest session
+#   gemini-agent --resume <uuid> <prompt>         # Resume session by UUID
+#   gemini-agent --resume 3 <prompt>              # Resume session by index
+#   gemini-agent --version                        # Show version diagnostics
 #   PROMPT_FILE=task.md gemini-agent              # Read from file
 #   cat task.md | gemini-agent                    # Read from stdin
 #
 # Environment variables:
 #   PROMPT_FILE          - Read prompt from this file
 #   GEMINI_MODEL         - Model to use (passed as --model)
-#   GEMINI_SESSION       - Session ID/index to resume
+#   GEMINI_SESSION       - Session to resume ("latest", UUID, or index number)
+#   GEMINI_API_KEY       - API key (alternative to OAuth)
+#   GOOGLE_GENAI_USE_GCA - Set to 'true' to use Gemini Code Assist auth
 
 set -euo pipefail
 
+MIN_VERSION="0.20.0"
+
+# Version comparison: returns 0 if $1 >= $2
+version_gte() {
+  printf '%s\n%s\n' "$2" "$1" | sort -V -C
+}
+
+# Show version diagnostics
+show_diagnostics() {
+  echo "" >&2
+  echo "=== Diagnostics ===" >&2
+
+  if ! command -v gemini >/dev/null 2>&1; then
+    echo "gemini CLI: NOT INSTALLED" >&2
+    echo "  Install with: npm install -g @google/gemini-cli" >&2
+    return
+  fi
+
+  local version
+  version=$(gemini --version 2>/dev/null || echo "unknown")
+  echo "gemini CLI: v${version} (at $(command -v gemini))" >&2
+  echo "  Min required: v${MIN_VERSION} (for --resume)" >&2
+
+  if [[ "$version" != "unknown" ]] && ! version_gte "$version" "$MIN_VERSION"; then
+    echo "  WARNING: Version too old! Run: npm install -g @google/gemini-cli@latest" >&2
+  fi
+
+  echo "" >&2
+  echo "Authentication:" >&2
+  [[ -n "${GEMINI_API_KEY:-}" ]] && echo "  GEMINI_API_KEY: set" >&2 || echo "  GEMINI_API_KEY: not set" >&2
+  [[ -n "${GOOGLE_GENAI_USE_GCA:-}" ]] && echo "  GOOGLE_GENAI_USE_GCA: ${GOOGLE_GENAI_USE_GCA}" >&2 || echo "  GOOGLE_GENAI_USE_GCA: not set" >&2
+  [[ -n "${GOOGLE_GENAI_USE_VERTEXAI:-}" ]] && echo "  GOOGLE_GENAI_USE_VERTEXAI: ${GOOGLE_GENAI_USE_VERTEXAI}" >&2 || echo "  GOOGLE_GENAI_USE_VERTEXAI: not set" >&2
+  [[ -s "${HOME}/.gemini/oauth_creds.json" ]] && echo "  OAuth creds: exists" >&2 || echo "  OAuth creds: missing" >&2
+
+  echo "" >&2
+  echo "Effective auth: " >&2
+  if [[ -n "${GEMINI_API_KEY:-}" ]]; then
+    echo "  API key" >&2
+  elif [[ -n "${GOOGLE_GENAI_USE_VERTEXAI:-}" ]]; then
+    echo "  Vertex AI" >&2
+  elif [[ -n "${GOOGLE_GENAI_USE_GCA:-}" ]] || [[ -s "${HOME}/.gemini/oauth_creds.json" ]]; then
+    echo "  Gemini Code Assist (GCA)" >&2
+  else
+    echo "  NONE - run 'gemini' interactively to set up OAuth" >&2
+  fi
+}
+
 MODEL="${GEMINI_MODEL:-}"
 RESUME="${GEMINI_SESSION:-}"
+SHOW_VERSION=false
 
 # Parse flags
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --model)
+    --version|-v)
+      SHOW_VERSION=true
+      shift
+      ;;
+    --model|-m)
       MODEL="$2"
       shift 2
       ;;
@@ -39,6 +96,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# If --version flag, show diagnostics and exit
+if [[ "$SHOW_VERSION" == "true" ]]; then
+  echo "gemini-agent wrapper"
+  show_diagnostics 2>&1  # redirect to stdout for --version
+  exit 0
+fi
+
 # Determine prompt source: PROMPT_FILE > args > stdin
 HAS_STDIN=false
 [[ ! -t 0 ]] && HAS_STDIN=true
@@ -50,7 +114,8 @@ elif [[ $# -gt 0 ]]; then
 elif [[ "$HAS_STDIN" == "true" ]]; then
   PROMPT="$(cat || true)"
 else
-  echo "Usage: gemini-agent [--model <model>] <prompt>" >&2
+  echo "Usage: gemini-agent [--model <model>] [--resume latest|<uuid>|<index>] <prompt>" >&2
+  echo "       gemini-agent --version" >&2
   echo "       PROMPT_FILE=task.md gemini-agent" >&2
   echo "       cat task.md | gemini-agent" >&2
   exit 1
@@ -64,44 +129,69 @@ fi
 
 # Verify gemini command exists
 if ! command -v gemini >/dev/null 2>&1; then
-  echo "Error: gemini command not found. Please install gemini CLI." >&2
+  echo "Error: gemini command not found. Install with: npm install -g @google/gemini-cli" >&2
+  show_diagnostics
   exit 1
+fi
+
+# Check version if using --resume
+if [[ -n "$RESUME" ]]; then
+  GEMINI_VERSION=$(gemini --version 2>/dev/null || echo "0.0.0")
+  if ! version_gte "$GEMINI_VERSION" "$MIN_VERSION"; then
+    echo "Error: --resume requires gemini CLI v${MIN_VERSION}+ (you have v${GEMINI_VERSION})" >&2
+    echo "Update with: npm install -g @google/gemini-cli@latest" >&2
+    show_diagnostics
+    exit 1
+  fi
 fi
 
 # Auto-detect auth: use GCA if OAuth creds exist and no explicit auth set
 if [[ -z "${GEMINI_API_KEY:-}" && -z "${GOOGLE_GENAI_USE_VERTEXAI:-}" && -z "${GOOGLE_GENAI_USE_GCA:-}" ]]; then
   if [[ -s "${HOME}/.gemini/oauth_creds.json" ]]; then
     export GOOGLE_GENAI_USE_GCA=true
+  else
+    echo "Error: No authentication configured." >&2
+    show_diagnostics
+    exit 1
   fi
 fi
 
-# Build command args
-GEMINI_ARGS=(-y --output-format json)
-[[ -n "$MODEL" ]] && GEMINI_ARGS+=(--model "$MODEL")
-[[ -n "$RESUME" ]] && GEMINI_ARGS+=(--resume "$RESUME")
+# Build command args - use JSON output to get session_id
+GEMINI_ARGS=(-y -o json)
+[[ -n "$MODEL" ]] && GEMINI_ARGS+=(-m "$MODEL")
+[[ -n "$RESUME" ]] && GEMINI_ARGS+=(-r "$RESUME")
+GEMINI_ARGS+=(-p "$PROMPT")
 
-# Run and capture output (stderr to /dev/null to avoid mixing with JSON)
-OUTPUT=$(gemini "${GEMINI_ARGS[@]}" "$PROMPT" 2>/dev/null)
+# Run gemini, show diagnostics on failure
+OUTPUT=$(gemini "${GEMINI_ARGS[@]}" 2>&1) || {
+  EXIT_CODE=$?
+  echo "$OUTPUT" | grep -v "^Data collection\|^Loaded cached\|^YOLO mode" >&2
+  show_diagnostics
+  exit $EXIT_CODE
+}
 
-# Extract response and session_id from JSON (output is pretty-printed multi-line JSON)
+# Filter noise lines from output
+CLEAN_OUTPUT=$(echo "$OUTPUT" | grep -v "^Data collection\|^Loaded cached\|^YOLO mode")
+
+# Extract session_id and response from JSON output
 if command -v jq >/dev/null 2>&1; then
-  RESPONSE=$(echo "$OUTPUT" | jq -r '.response // empty' 2>/dev/null)
-  SESSION_ID=$(echo "$OUTPUT" | jq -r '.session_id // empty' 2>/dev/null)
+  SESSION_ID=$(echo "$CLEAN_OUTPUT" | jq -r '.session_id // empty' 2>/dev/null)
+  RESPONSE=$(echo "$CLEAN_OUTPUT" | jq -r '.response // empty' 2>/dev/null)
 else
   # Fallback: basic extraction without jq
-  RESPONSE=$(echo "$OUTPUT" | grep -oP '"response"\s*:\s*"\K[^"]*' | head -1)
-  SESSION_ID=$(echo "$OUTPUT" | grep -oP '"session_id"\s*:\s*"\K[^"]*' | head -1)
+  SESSION_ID=$(echo "$CLEAN_OUTPUT" | grep -oP '"session_id"\s*:\s*"\K[^"]+' | head -1)
+  RESPONSE=$(echo "$CLEAN_OUTPUT" | grep -oP '"response"\s*:\s*"\K[^"]*' | head -1)
 fi
 
 # Output response
 if [[ -n "$RESPONSE" ]]; then
   echo "$RESPONSE"
 else
-  # If JSON parsing failed, output raw (minus stderr lines)
-  echo "$OUTPUT" | grep -v "^YOLO mode\|^Loaded cached"
+  # If JSON parsing failed, output raw (probably error message)
+  echo "$CLEAN_OUTPUT"
 fi
 
-# Always output session ID for caller to capture
+# Output session ID for caller to capture
 if [[ -n "$SESSION_ID" ]]; then
   echo ""
   echo "[session_id: $SESSION_ID]"

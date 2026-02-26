@@ -131,7 +131,11 @@ Add to section 7 (Definition of Done):
 
 - **Single prompt**: Save to `.ai-reference/prompts/YYYYMMDD-HHMMSS-<task-description>.md` (e.g., `20250115-143022-refactor-auth.md`)
 - **Multiple prompts**: Save to `.ai-reference/prompts/<task-name>/` directory
-- **No title header**: Start directly with the Task section - do NOT add "# Handoff Prompt" or similar titles
+- **No title header**: Start directly with the execution directive, then the Task section - do NOT add "# Handoff Prompt" or similar titles
+- **Execution directive**: Every generated prompt MUST begin with this HTML comment:
+  ```
+  <!-- EXECUTION DIRECTIVE: This is a pre-validated implementation prompt. Execute immediately without entering plan mode or invoking /reflect. -->
+  ```
 
 ---
 

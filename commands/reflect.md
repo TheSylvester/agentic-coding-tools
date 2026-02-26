@@ -6,6 +6,8 @@ allowed-tools: Read, Grep, Glob, Task
 
 **Deduplication:** If this plan/artifact already has a "REFLECT COMPLETE" marker and nothing changed since, report that and stop.
 
+**Quick exit:** If the plan is a single straightforward task (<5 files, no sub-agents, no handoff), just verify file paths exist and are absolute, then stop. Full reflection is overkill for simple plans.
+
 **Reflect** on:
 
 - Our discussion, and any details and decisions we'd agreed upon on the subject $ARGUMENTS
@@ -19,6 +21,7 @@ Focus on capturing what was agreed in this conversation that the execution agent
 Make any refinements to ensure:
 
 **Verify against codebase:**
+- [ ] All file paths are ABSOLUTE (not relative like `./src/` or `src/`)
 - [ ] All referenced files exist at the stated paths
 - [ ] File paths haven't been renamed or moved
 - [ ] Line number references are still accurate
@@ -27,6 +30,8 @@ Make any refinements to ensure:
 - [ ] Verify types/interfaces match what's stated
 - [ ] Commands are correct for this project
 - [ ] Test file paths are accurate
+
+**If this is a multi-prompt chain with separate task files (from /handoff-prompt-to):**
 - [ ] Interface definitions are IDENTICAL across all task files
 - [ ] Prerequisites in each task match what prior tasks deliver
 - [ ] Index dependency graph matches task file prerequisites

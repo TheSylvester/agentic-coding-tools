@@ -145,6 +145,7 @@ if [[ -n "$RESUME" ]]; then
   CODEX_CMD=(codex exec resume --dangerously-bypass-approvals-and-sandbox)
   [[ -n "$MODEL" ]] && CODEX_CMD+=(-m "$MODEL")
 
+
   if [[ "$RESUME" == "latest" ]]; then
     CODEX_CMD+=(--last)
   else
@@ -155,6 +156,7 @@ else
   # New session mode
   CODEX_CMD=(codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check)
   [[ -n "$MODEL" ]] && CODEX_CMD+=(-m "$MODEL")
+
   CODEX_CMD+=("$PROMPT")
 fi
 

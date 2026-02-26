@@ -27,20 +27,22 @@ cat prompt.md | .claude/skills/super-agent/scripts/super-agent
 .claude/skills/super-agent/scripts/super-agent --resume <session-id> "Yes, proceed"
 ```
 
-Use `SUPER_AGENT_DEBUG=1` on initial run to capture session ID.
+The session ID is always printed at the end of output as `[session_id: ...]`.
 
 ## Options
 
 | Flag / Variable         | Description                              |
 | ----------------------- | ---------------------------------------- |
 | `--no-chrome`           | Disable Chrome (enabled by default)      |
+| `--no-persist`          | Don't save session to disk               |
 | `--fork`, `-f`          | Fork from SESSION_ID context             |
 | `--resume`, `-r`        | Resume a previous session                |
 | `PROMPT_FILE`           | Read prompt from file                    |
 | `BYPASS_PERMISSIONS=1`  | Full autonomy mode                       |
-| `SUPER_AGENT_DEBUG=1`   | Print session ID & cost                  |
+| `SUPER_AGENT_DEBUG=1`   | Print cost to stderr                     |
 | `SUPER_AGENT_CHROME=0`  | Disable Chrome (env var form)            |
 | `SESSION_ID`            | Session ID for --fork                    |
+| `SUPER_AGENT_MODEL`     | Override model (e.g., claude-sonnet-4-5) |
 
 ## Monitoring
 

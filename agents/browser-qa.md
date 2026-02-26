@@ -1,7 +1,8 @@
 ---
 name: browser-qa
+model: sonnet
 description: Visual UI testing and verification via browser automation. Use when testing user flows, checking styling/formatting, or investigating UI issues in the browser.
-skills: claude-in-chrome-image
+skills: chrome-screenshot
 ---
 
 Visual QA agent using Claude's built-in Chrome integration (`claude-in-chrome` MCP).
@@ -65,11 +66,11 @@ When you take a screenshot, you receive an ID like `ss_3669oma6t`. **Always repo
 
 ## Saving & Viewing Screenshots
 
-Use `claude-in-chrome-image` to save screenshots from IDs:
+Use `chrome-screenshot` to save screenshots from IDs:
 
 ```bash
 # Save to file (outputs path, then you can Read it)
-claude-in-chrome-image ss_3669oma6t .ai-reference/screenshots/homepage.jpg
+chrome-screenshot ss_3669oma6t .ai-reference/screenshots/homepage.jpg
 
 # Then view it
 Read .ai-reference/screenshots/homepage.jpg
@@ -79,8 +80,8 @@ Use descriptive names: `before-click.jpg`, `error-state.jpg`, `final-result.jpg`
 
 **Comparing screenshots:** Save both, then Read both in the same response:
 ```bash
-claude-in-chrome-image ss_abc123 .ai-reference/screenshots/before.jpg
-claude-in-chrome-image ss_def456 .ai-reference/screenshots/after.jpg
+chrome-screenshot ss_abc123 .ai-reference/screenshots/before.jpg
+chrome-screenshot ss_def456 .ai-reference/screenshots/after.jpg
 ```
 ```
 Read .ai-reference/screenshots/before.jpg

@@ -1,6 +1,6 @@
 ---
 argument-hint: [impl-prompt-path OR target-code]
-description: Walk through a design or codebase interactively, pausing for questions at each milestone
+description: Walk through actual code in a codebase, reading files and showing what's really there, pausing for questions at each milestone
 ---
 
 Walk me through: $ARGUMENTS
@@ -22,6 +22,13 @@ Then call `ExitPlanMode`.
 
 You ARE the walkthrough agent. For each milestone:
 
+### Code-first rule (MANDATORY)
+
+**The prompt tells you where to look. The code is what you present.** Before each milestone, read the actual source files. Walk the user through what you find there — not what the prompt *says* is there. The prompt may have stale line numbers, wrong names, or outdated descriptions. If the code differs, trust the code and say so.
+
+### Delivery
+
+- **Read first, talk second** — open every file you're about to reference; present what's actually in them
 - **Always include `file:line` references** — user wants to jump to code in their editor
 - Explain conceptually (what, why, how it fits)
 - Show key types, interfaces, data flow with their locations

@@ -106,24 +106,69 @@ fi
 # Determine prompt source: PROMPT_FILE > args > stdin
 HAS_STDIN=false
 [[ ! -t 0 ]] && HAS_STDIN=true
+PROMPT_SOURCE=""
+
+# Validate: PROMPT_FILE and actual stdin content are mutually exclusive
+# Also catch the common mistake of PROMPT_FILE=/dev/stdin
+if [[ -n "${PROMPT_FILE:-}" ]]; then
+  if [[ "$PROMPT_FILE" == "/dev/stdin" || "$PROMPT_FILE" == "-" ]]; then
+    echo "Error: PROMPT_FILE=/dev/stdin is not supported." >&2
+    echo "" >&2
+    echo "Instead, use stdin directly:" >&2
+    echo "  cat task.md | gemini-agent" >&2
+    echo "  gemini-agent <<'EOF'" >&2
+    echo "  your prompt here" >&2
+    echo "  EOF" >&2
+    exit 1
+  fi
+  # If PROMPT_FILE is set and there's stdin content, warn (but PROMPT_FILE takes priority)
+  if [[ "$HAS_STDIN" == "true" ]]; then
+    # Check if stdin actually has content (non-blocking peek)
+    if read -t 0 2>/dev/null; then
+      echo "Warning: stdin input ignored because PROMPT_FILE is set." >&2
+      echo "  Using: $PROMPT_FILE" >&2
+    fi
+  fi
+fi
 
 if [[ -n "${PROMPT_FILE:-}" ]]; then
+  if [[ ! -f "$PROMPT_FILE" ]]; then
+    echo "Error: PROMPT_FILE '$PROMPT_FILE' does not exist or is not a file." >&2
+    exit 1
+  fi
   PROMPT="$(cat "$PROMPT_FILE")"
+  PROMPT_SOURCE="file:$PROMPT_FILE"
 elif [[ $# -gt 0 ]]; then
   PROMPT="$*"
+  PROMPT_SOURCE="args"
 elif [[ "$HAS_STDIN" == "true" ]]; then
   PROMPT="$(cat || true)"
+  PROMPT_SOURCE="stdin"
 else
   echo "Usage: gemini-agent [--model <model>] [--resume latest|<uuid>|<index>] <prompt>" >&2
   echo "       gemini-agent --version" >&2
-  echo "       PROMPT_FILE=task.md gemini-agent" >&2
-  echo "       cat task.md | gemini-agent" >&2
+  echo "" >&2
+  echo "Prompt input methods (use ONE):" >&2
+  echo "  Args:       gemini-agent \"your prompt here\"" >&2
+  echo "  File:       PROMPT_FILE=task.md gemini-agent" >&2
+  echo "  Stdin:      cat task.md | gemini-agent" >&2
+  echo "  Heredoc:    gemini-agent <<'EOF'" >&2
+  echo "              your prompt" >&2
+  echo "              EOF" >&2
   exit 1
 fi
 
 # Validate prompt
 if [[ -z "${PROMPT//[$' \t\r\n']/}" ]]; then
-  echo "Error: prompt is empty" >&2
+  echo "Error: prompt is empty (source: ${PROMPT_SOURCE:-none})" >&2
+  echo "" >&2
+  echo "Prompt input methods (use ONE):" >&2
+  echo "  Args:       gemini-agent \"your prompt here\"" >&2
+  echo "  File:       PROMPT_FILE=task.md gemini-agent" >&2
+  echo "  Stdin:      cat task.md | gemini-agent" >&2
+  echo "  Heredoc:    gemini-agent <<'EOF'" >&2
+  echo "              your prompt" >&2
+  echo "              EOF" >&2
   exit 1
 fi
 
@@ -165,22 +210,44 @@ GEMINI_ARGS+=(-p "$PROMPT")
 # Run gemini, show diagnostics on failure
 OUTPUT=$(gemini "${GEMINI_ARGS[@]}" 2>&1) || {
   EXIT_CODE=$?
-  echo "$OUTPUT" | grep -v "^Data collection\|^Loaded cached\|^YOLO mode" >&2
+  echo "Error: gemini command failed (exit code $EXIT_CODE)" >&2
+  echo "" >&2
+
+  # Show what was attempted
+  echo "=== What was attempted ===" >&2
+  echo "Prompt source: $PROMPT_SOURCE" >&2
+  echo "Prompt length: ${#PROMPT} chars" >&2
+  PROMPT_PREVIEW="${PROMPT:0:200}"
+  [[ ${#PROMPT} -gt 200 ]] && PROMPT_PREVIEW="${PROMPT_PREVIEW}..."
+  echo "Prompt preview: $PROMPT_PREVIEW" >&2
+  echo "" >&2
+  echo "Command: gemini ${GEMINI_ARGS[*]:0:3} -p <prompt>" >&2
+  echo "" >&2
+
+  # Show gemini output (filtered)
+  FILTERED_OUTPUT=$(echo "$OUTPUT" | grep -v "^Data collection\|^Loaded cached\|^YOLO mode")
+  if [[ -n "$FILTERED_OUTPUT" ]]; then
+    echo "=== Gemini output ===" >&2
+    echo "$FILTERED_OUTPUT" >&2
+  fi
+
   show_diagnostics
   exit $EXIT_CODE
 }
 
-# Filter noise lines from output
-CLEAN_OUTPUT=$(echo "$OUTPUT" | grep -v "^Data collection\|^Loaded cached\|^YOLO mode")
+# Filter noise lines from output - gemini CLI prints status messages before JSON
+# Use grep -v with || true to handle case where all lines are filtered
+CLEAN_OUTPUT=$(echo "$OUTPUT" | grep -v "^Data collection\|^Loaded cached\|^YOLO mode\|^Hook registry\|^Attempt .* failed:" || true)
 
-# Extract session_id and response from JSON output
+# Extract session_id and response from JSON output (which is multi-line pretty-printed)
 if command -v jq >/dev/null 2>&1; then
-  SESSION_ID=$(echo "$CLEAN_OUTPUT" | jq -r '.session_id // empty' 2>/dev/null)
-  RESPONSE=$(echo "$CLEAN_OUTPUT" | jq -r '.response // empty' 2>/dev/null)
+  # jq can handle multi-line JSON directly
+  SESSION_ID=$(echo "$CLEAN_OUTPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
+  RESPONSE=$(echo "$CLEAN_OUTPUT" | jq -r '.response // empty' 2>/dev/null || true)
 else
-  # Fallback: basic extraction without jq
-  SESSION_ID=$(echo "$CLEAN_OUTPUT" | grep -oP '"session_id"\s*:\s*"\K[^"]+' | head -1)
-  RESPONSE=$(echo "$CLEAN_OUTPUT" | grep -oP '"response"\s*:\s*"\K[^"]*' | head -1)
+  # Fallback: basic extraction without jq (works on pretty-printed JSON)
+  SESSION_ID=$(echo "$CLEAN_OUTPUT" | grep -oP '"session_id"\s*:\s*"\K[^"]+' | head -1 || true)
+  RESPONSE=$(echo "$CLEAN_OUTPUT" | grep -oP '"response"\s*:\s*"\K[^"]*' | head -1 || true)
 fi
 
 # Output response

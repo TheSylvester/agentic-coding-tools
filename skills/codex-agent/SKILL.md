@@ -1,10 +1,26 @@
 ---
 name: codex-agent
-description: Wrapper around codex CLI for non-interactive runs (prompt via args/file/stdin) with resume support.
+description: Wrapper around codex CLI for non-interactive runs (prompt via args/file/stdin) with resume support. Outputs session_id for conversation continuation.
 allowed-tools: Bash
 ---
 
 # Codex Agent (wrapper)
+
+## IMPORTANT: Execution Instructions
+
+**This script runs synchronously and returns output directly. Do NOT run it in the background.**
+
+When invoking via Bash, you MUST:
+1. Use `timeout: 600000` (10 minutes) — codex runs can take several minutes
+2. Run it as a **foreground** command (do NOT use `run_in_background`)
+3. Read the output directly from the Bash result — no need to poll or check later
+
+Example Bash invocation:
+```
+Bash(command: "~/.claude/skills/codex-agent/scripts/codex-agent Your prompt here", timeout: 600000)
+```
+
+---
 
 Thin wrapper around `codex` CLI (OpenAI Codex) for non-interactive use:
 
@@ -57,7 +73,7 @@ CODEX_SESSION=latest ~/.claude/skills/codex-agent/scripts/codex-agent "Follow-up
 
 ```bash
 # Via flag
-~/.claude/skills/codex-agent/scripts/codex-agent --model o3 "Your prompt"
+~/.claude/skills/codex-agent/scripts/codex-agent --model gpt-5.2-codex "Your prompt"
 
 # Via environment variable
 CODEX_MODEL=gpt-5.2-codex ~/.claude/skills/codex-agent/scripts/codex-agent "Your prompt"

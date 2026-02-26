@@ -1,0 +1,411 @@
+#!/usr/bin/env python3
+"""
+council: Multi-agent debate orchestrator.
+
+Runs parallel agent panels with a Chair LLM synthesizing responses.
+Each round: all agents respond in parallel, Chair decides to continue or finalize.
+
+Usage:
+  council "What's the best approach for X?"
+  council --agents codex,gemini "Review this design"
+  council --max-rounds 3 "Debate the tradeoffs of Y"
+  PROMPT_FILE=question.md council
+"""
+
+import os
+import sys
+import asyncio
+import argparse
+import subprocess
+import re
+import json
+from pathlib import Path
+from dataclasses import dataclass, field
+
+# Agent script paths
+AGENT_SCRIPTS = {
+    "codex": Path.home() / ".claude/skills/codex-agent/scripts/codex-agent",
+    "gemini": Path.home() / ".claude/skills/gemini-agent/scripts/gemini-agent",
+    "super": Path.home() / ".claude/skills/super-agent/scripts/super-agent",
+}
+
+DEFAULT_AGENTS = ["gemini", "super"]  # codex often rate-limited, make it opt-in
+MAX_ROUNDS_DEFAULT = 3
+AGENT_TIMEOUT = 300  # 5 minutes per agent
+
+
+@dataclass
+class AgentState:
+    """Tracks an agent's session across rounds."""
+    name: str
+    session_id: str | None = None
+    responses: list[str] = field(default_factory=list)
+
+
+@dataclass
+class CouncilState:
+    """Full council state."""
+    question: str
+    agents: dict[str, AgentState] = field(default_factory=dict)
+    rounds: list[dict[str, str]] = field(default_factory=list)  # [{agent: response}, ...]
+    current_synthesis: str = ""
+    round_num: int = 0
+
+
+def parse_session_id(output: str) -> str | None:
+    """Extract [session_id: ...] from agent output."""
+    match = re.search(r'\[session_id:\s*([^\]]+)\]', output)
+    return match.group(1).strip() if match else None
+
+
+def strip_session_id_line(output: str) -> str:
+    """Remove the session_id line from output for cleaner display."""
+    return re.sub(r'\n?\[session_id:[^\]]+\]\s*$', '', output).strip()
+
+
+async def invoke_agent(
+    agent: AgentState,
+    prompt: str,
+    timeout: int = AGENT_TIMEOUT
+) -> tuple[str, str | None]:
+    """
+    Invoke an agent script, optionally resuming.
+    Returns (response_text, session_id).
+    """
+    script = AGENT_SCRIPTS.get(agent.name)
+    if not script or not script.exists():
+        return f"[ERROR: Agent script not found: {agent.name}]", None
+
+    cmd = [str(script)]
+
+    # Use --resume if we have a session
+    if agent.session_id:
+        cmd.extend(["--resume", agent.session_id])
+
+    cmd.append(prompt)
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(),
+            timeout=timeout
+        )
+
+        output = stdout.decode('utf-8', errors='replace')
+
+        if proc.returncode != 0:
+            error = stderr.decode('utf-8', errors='replace')
+            # Check for rate limit
+            if "usage_limit" in error or "rate" in error.lower():
+                return f"[RATE LIMITED - skipping {agent.name}]", None
+            return f"[ERROR: {agent.name} failed]\n{error[:500]}", None
+
+        session_id = parse_session_id(output)
+        clean_output = strip_session_id_line(output)
+
+        return clean_output, session_id
+
+    except asyncio.TimeoutError:
+        return f"[TIMEOUT: {agent.name} exceeded {timeout}s]", agent.session_id
+    except Exception as e:
+        return f"[ERROR: {agent.name}] {str(e)[:200]}", None
+
+
+async def run_parallel_round(
+    state: CouncilState,
+    round_prompt: str
+) -> dict[str, str]:
+    """Run all agents in parallel with the same prompt."""
+
+    async def invoke_one(name: str) -> tuple[str, str]:
+        agent = state.agents[name]
+        response, session_id = await invoke_agent(agent, round_prompt)
+
+        # Update session ID if we got one
+        if session_id:
+            agent.session_id = session_id
+
+        agent.responses.append(response)
+        return name, response
+
+    tasks = [invoke_one(name) for name in state.agents]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    round_responses = {}
+    for result in results:
+        if isinstance(result, Exception):
+            print(f"[Agent error: {result}]", file=sys.stderr)
+        else:
+            name, response = result
+            round_responses[name] = response
+
+    return round_responses
+
+
+def build_round_prompt(state: CouncilState, is_first_round: bool) -> str:
+    """Build the prompt for panelists this round."""
+
+    if is_first_round:
+        return f"""You are a panelist in a multi-agent council debate.
+
+QUESTION: {state.question}
+
+Provide your perspective. Be specific and substantive.
+If you have nothing to add beyond what's obvious, say "PASS".
+Keep your response focused (2-4 paragraphs max)."""
+
+    else:
+        # Include previous round's responses
+        prev_round = state.rounds[-1]
+        other_views = "\n\n".join([
+            f"### {name.upper()}'s view:\n{resp}"
+            for name, resp in prev_round.items()
+        ])
+
+        return f"""You are a panelist in a multi-agent council debate (Round {state.round_num + 1}).
+
+ORIGINAL QUESTION: {state.question}
+
+CURRENT SYNTHESIS BY CHAIR:
+{state.current_synthesis}
+
+OTHER PANELISTS' VIEWS FROM LAST ROUND:
+{other_views}
+
+Respond to the other perspectives. Add new insights, corrections, or nuance.
+If you agree and have nothing to add, say "PASS".
+Keep your response focused."""
+
+
+def build_chair_prompt(state: CouncilState, round_responses: dict[str, str]) -> str:
+    """Build the prompt for the Chair to synthesize."""
+
+    responses_text = "\n\n".join([
+        f"### {name.upper()}:\n{resp}"
+        for name, resp in round_responses.items()
+    ])
+
+    history = ""
+    if state.rounds:
+        history = f"\n\nPREVIOUS SYNTHESIS:\n{state.current_synthesis}"
+
+    return f"""You are the Council Chair. Your job is to synthesize panelist responses into a coherent answer.
+
+ORIGINAL QUESTION: {state.question}
+{history}
+
+ROUND {state.round_num + 1} RESPONSES:
+{responses_text}
+
+---
+
+Analyze the responses and provide:
+
+1. **SYNTHESIS**: Your updated answer incorporating valid points from all panelists.
+
+2. **DECISION**: Either:
+   - "CONTINUE" if there's meaningful disagreement worth exploring, OR
+   - "DONE" if consensus is reached or further debate won't help
+
+Format your response as:
+
+## Synthesis
+[Your synthesized answer]
+
+## Decision
+[CONTINUE or DONE]
+
+## Reasoning
+[Brief explanation of your decision]"""
+
+
+async def invoke_chair(prompt: str) -> tuple[str, bool]:
+    """
+    Invoke super-agent as Chair.
+    Returns (synthesis, should_continue).
+    """
+    script = AGENT_SCRIPTS["super"]
+
+    proc = await asyncio.create_subprocess_exec(
+        str(script),
+        "--max-turns", "1",  # Chair should respond in one turn
+        prompt,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout, stderr = await asyncio.wait_for(
+        proc.communicate(),
+        timeout=AGENT_TIMEOUT
+    )
+
+    output = stdout.decode('utf-8', errors='replace')
+    output = strip_session_id_line(output)
+
+    # Parse decision
+    should_continue = "CONTINUE" in output.upper() and "DONE" not in output.split("CONTINUE")[0].upper()
+
+    # Extract synthesis section
+    synthesis_match = re.search(r'## Synthesis\s*\n(.*?)(?=\n## |\Z)', output, re.DOTALL)
+    synthesis = synthesis_match.group(1).strip() if synthesis_match else output
+
+    return synthesis, should_continue
+
+
+async def run_council(
+    question: str,
+    agent_names: list[str],
+    max_rounds: int,
+    verbose: bool = False
+) -> str:
+    """Run the full council debate."""
+
+    # Initialize state
+    state = CouncilState(
+        question=question,
+        agents={name: AgentState(name=name) for name in agent_names}
+    )
+
+    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"COUNCIL CONVENED", file=sys.stderr)
+    print(f"Question: {question[:100]}{'...' if len(question) > 100 else ''}", file=sys.stderr)
+    print(f"Panelists: {', '.join(agent_names)}", file=sys.stderr)
+    print(f"Max rounds: {max_rounds}", file=sys.stderr)
+    print(f"{'='*60}\n", file=sys.stderr)
+
+    for round_num in range(max_rounds):
+        state.round_num = round_num
+        is_first = round_num == 0
+
+        print(f"--- Round {round_num + 1} ---", file=sys.stderr)
+
+        # Build prompt for panelists
+        round_prompt = build_round_prompt(state, is_first)
+
+        # Run all agents in parallel
+        print(f"  Querying {len(state.agents)} agents in parallel...", file=sys.stderr)
+        round_responses = await run_parallel_round(state, round_prompt)
+        state.rounds.append(round_responses)
+
+        if verbose:
+            for name, resp in round_responses.items():
+                print(f"\n  [{name.upper()}]: {resp[:200]}...", file=sys.stderr)
+
+        # Check for all PASS
+        all_pass = all(
+            "PASS" in resp.upper() and len(resp.strip()) < 50
+            for resp in round_responses.values()
+        )
+
+        if all_pass:
+            print(f"  All agents passed. Ending debate.", file=sys.stderr)
+            break
+
+        # Chair synthesizes
+        print(f"  Chair synthesizing...", file=sys.stderr)
+        chair_prompt = build_chair_prompt(state, round_responses)
+        synthesis, should_continue = await invoke_chair(chair_prompt)
+        state.current_synthesis = synthesis
+
+        if verbose:
+            print(f"\n  [CHAIR]: {synthesis[:200]}...", file=sys.stderr)
+
+        if not should_continue:
+            print(f"  Chair decided: DONE", file=sys.stderr)
+            break
+        else:
+            print(f"  Chair decided: CONTINUE", file=sys.stderr)
+
+    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"COUNCIL ADJOURNED after {state.round_num + 1} round(s)", file=sys.stderr)
+    print(f"{'='*60}\n", file=sys.stderr)
+
+    return state.current_synthesis
+
+
+def get_prompt(args: list[str]) -> str:
+    """Get prompt from PROMPT_FILE, args, or stdin."""
+    if (pf := os.environ.get("PROMPT_FILE")):
+        return Path(pf).read_text(encoding="utf-8").strip()
+    if args:
+        return " ".join(args).strip()
+    if not sys.stdin.isatty():
+        return sys.stdin.read().strip()
+    return ""
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Multi-agent council debate orchestrator",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  council "What's the best architecture for X?"
+  council --agents codex,gemini,super "Review this plan"
+  council --max-rounds 5 --verbose "Debate the tradeoffs"
+  PROMPT_FILE=question.md council
+
+Environment:
+  PROMPT_FILE    Read question from file
+  COUNCIL_AGENTS Default agents (comma-separated)
+        """,
+    )
+    parser.add_argument("question", nargs="*", help="Question for the council")
+    parser.add_argument(
+        "--agents", "-a",
+        default=os.environ.get("COUNCIL_AGENTS", ",".join(DEFAULT_AGENTS)),
+        help=f"Comma-separated agent names (default: {','.join(DEFAULT_AGENTS)})"
+    )
+    parser.add_argument(
+        "--max-rounds", "-r",
+        type=int,
+        default=MAX_ROUNDS_DEFAULT,
+        help=f"Maximum debate rounds (default: {MAX_ROUNDS_DEFAULT})"
+    )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show agent responses in real-time"
+    )
+
+    args = parser.parse_args()
+
+    question = get_prompt(args.question)
+    if not question:
+        parser.print_help(sys.stderr)
+        return 1
+
+    agent_names = [a.strip() for a in args.agents.split(",") if a.strip()]
+
+    # Validate agents
+    for name in agent_names:
+        if name not in AGENT_SCRIPTS:
+            print(f"Error: Unknown agent '{name}'. Available: {', '.join(AGENT_SCRIPTS.keys())}", file=sys.stderr)
+            return 1
+
+    try:
+        result = asyncio.run(run_council(
+            question=question,
+            agent_names=agent_names,
+            max_rounds=args.max_rounds,
+            verbose=args.verbose,
+        ))
+
+        # Output final synthesis to stdout
+        print(result)
+        return 0
+
+    except KeyboardInterrupt:
+        print("\n[Council interrupted]", file=sys.stderr)
+        return 130
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

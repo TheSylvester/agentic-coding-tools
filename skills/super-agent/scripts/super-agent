@@ -4,6 +4,8 @@ super-agent: SDK-based agent runner with full sub-agent capabilities.
 
 Reads prompt from PROMPT_FILE, args, or stdin and runs via the Agent SDK.
 Transcripts land in ~/.claude/projects/<cwd-slug>/.
+
+SDK Version: Requires claude-agent-sdk >= 0.1.19
 """
 
 import os
@@ -27,21 +29,25 @@ def get_prompt(args: list[str]) -> str:
     return ""
 
 
-async def run(prompt: str, resume: str | None, fork: bool, chrome: bool) -> int:
+async def run(prompt: str, resume: str | None, fork: bool, chrome: bool, no_persist: bool = False) -> int:
     model = os.environ.get("SUPER_AGENT_MODEL")  # keep for drop-in compatibility
     bypass = os.environ.get("BYPASS_PERMISSIONS") == "1"
     debug = os.environ.get("SUPER_AGENT_DEBUG") == "1"
 
     # Build options - use keyword args for all config
+    # Using 'tools' preset instead of explicit 'allowed_tools' list gives all Claude Code tools
     opts = ClaudeAgentOptions(
-        allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task", "WebSearch", "Skill"],
+        tools={"type": "preset", "preset": "claude_code"},  # All Claude Code tools (Read, Write, Edit, Bash, Glob, Grep, Task, WebSearch, Skill, etc.)
         permission_mode="bypassPermissions" if bypass else "acceptEdits",
         setting_sources=["user", "project", "local"],  # Full settings like CLI
         system_prompt={"type": "preset", "preset": "claude_code"},  # Enable skills
         model=model,  # None if not set, which uses default
         resume=resume,  # Session ID to resume (if provided)
         fork_session=fork,  # Fork instead of continue when resuming
-        extra_args={"chrome": None} if chrome else {},  # Enable Chrome MCP if chrome=True, else empty dict
+        extra_args={
+            **({"chrome": None} if chrome else {}),
+            **({"no-session-persistence": None} if no_persist else {}),
+        },
     )
 
     exit_code = 0
@@ -59,6 +65,10 @@ async def run(prompt: str, resume: str | None, fork: bool, chrome: bool) -> int:
             session_id = message.session_id
             # Ensure final newline after streaming text
             print()
+
+            # Always output session_id to stdout (uniform with codex/gemini agents)
+            if session_id:
+                print(f"\n[session_id: {session_id}]")
 
             if debug:
                 print(f"[Session: {session_id}]", file=sys.stderr)
@@ -81,7 +91,7 @@ Environment variables:
   PROMPT_FILE           Read prompt from this file
   SUPER_AGENT_MODEL     Override model (e.g., claude-sonnet-4-5)
   BYPASS_PERMISSIONS=1  Run with bypassPermissions mode
-  SUPER_AGENT_DEBUG=1   Print session ID and cost to stderr
+  SUPER_AGENT_DEBUG=1   Print cost to stderr
   SESSION_ID            Session ID for --fork (alternative to --resume)
 
 Examples:
@@ -107,7 +117,11 @@ Examples:
         action="store_true",
         help="Disable Chrome browser automation (enabled by default)",
     )
-
+    parser.add_argument(
+        "--no-persist",
+        action="store_true",
+        help="Don't save session to disk (cannot be resumed)",
+    )
     args = parser.parse_args()
 
     prompt = get_prompt(args.prompt)
@@ -127,7 +141,13 @@ Examples:
     use_chrome = not args.no_chrome and os.environ.get("SUPER_AGENT_CHROME") != "0"
 
     try:
-        return asyncio.run(run(prompt, resume=resume_id, fork=args.fork, chrome=use_chrome))
+        return asyncio.run(run(
+            prompt,
+            resume=resume_id,
+            fork=args.fork,
+            chrome=use_chrome,
+            no_persist=args.no_persist,
+        ))
     except KeyboardInterrupt:
         return 130
 

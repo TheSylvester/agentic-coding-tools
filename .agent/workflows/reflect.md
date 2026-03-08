@@ -36,6 +36,14 @@ Make any refinements to ensure:
 - [ ] Index dependency graph matches task file prerequisites
 - [ ] No conflicts between what tasks produce vs consume
 
+**Execution structure:**
+- [ ] Plans use sub-agents for parallel/independent work (multiple Task calls in one message, not sequential)
+- [ ] Exploration and research steps use sub-agents (isolated context, synthesized findings)
+- [ ] If the plan involves significant code changes, consider adding a simplification/refactoring pass before testing
+- [ ] Testing/typecheck/lint steps come after any refactoring passes
+
 ---
 
 Directly update the artifacts, prompt files, and/or other plan file in question with the refinements required.
+
+End with "REFLECT COMPLETE" to signal verification is done.

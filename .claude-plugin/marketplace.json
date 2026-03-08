@@ -15,7 +15,7 @@
         "source": "url",
         "url": "https://github.com/TheSylvester/agentic-coding-tools.git"
       },
-      "description": "Complete agentic coding toolkit with skills for sub-agent orchestration (super-agent, cursor-agent, gemini-agent), prompt synthesis commands (handoff-prompt-to, pair-prompt-to, reflect, walkthrough-prompt-to), and specialized agents (browser-qa, ui-clone)",
+      "description": "Complete agentic coding toolkit with skills for sub-agent orchestration (super-agent, cursor-agent, gemini-agent, codex-agent), prompt synthesis commands (handoff-prompt-to, pair-prompt-to, reflect, walkthrough), multi-agent review (council, multi-agent-review, swarm-think), and specialized agents (browser-qa, ui-clone)",
       "version": "1.0.0",
       "category": "development",
       "strict": false
@@ -51,9 +51,19 @@
       }
     },
     {
-      "name": "git-worktree",
-      "source": "./skills/git-worktree",
-      "description": "Create a git worktree with automatic symlinking of gitignored local files (.env*, .ai-*, etc.) from the root worktree.",
+      "name": "codex-agent",
+      "source": "./skills/codex-agent",
+      "description": "Wrapper around codex CLI for non-interactive runs (prompt via args/file/stdin) with resume support. Outputs session_id for conversation continuation.",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
+    },
+    {
+      "name": "council",
+      "source": "./skills/council",
+      "description": "Multi-agent debate orchestrator. Runs parallel agent panels with a Chair synthesizing responses across rounds.",
       "version": "1.0.0",
       "category": "development",
       "author": {
@@ -64,6 +74,36 @@
       "name": "build-prompt-chain",
       "source": "./skills/build-prompt-chain",
       "description": "Build a phased prompt chain with orchestration file from a monolithic implementation prompt.",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
+    },
+    {
+      "name": "super-implement",
+      "source": "./skills/super-implement",
+      "description": "Transform a plan into execution-ready prompt artifacts — single handoff prompts, parallel prompts, or phased prompt chains with orchestration.",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
+    },
+    {
+      "name": "save-plan",
+      "source": "./skills/save-plan",
+      "description": "Save the current session's plan file to the project's .ai-reference/plans/ folder for editing and reuse.",
+      "version": "1.0.0",
+      "category": "development",
+      "author": {
+        "name": "TheSylvester"
+      }
+    },
+    {
+      "name": "spec-mode",
+      "source": "./skills/spec-mode",
+      "description": "Interactive spec-building mode. Incrementally build a feature spec through conversation with decisions tracked in Agreed/Open sections.",
       "version": "1.0.0",
       "category": "development",
       "author": {

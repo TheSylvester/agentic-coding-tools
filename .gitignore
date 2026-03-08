@@ -29,7 +29,9 @@ projects/
 plugins/
 
 # Working/temp directories
-ai-reference/
+.ai-reference/
+backups/
+tasks/
 
 # Custom scripts (optional - remove if you want to share)
 statusline.py
@@ -46,7 +48,11 @@ Thumbs.db
 *~
 
 # Nested git repos
-skills/codex/.git/
+skills/codex-agent/.git/
+
+# Personal config (not portable)
+CLAUDE.md
+hooks/
 
 # cache
 leto-cache/

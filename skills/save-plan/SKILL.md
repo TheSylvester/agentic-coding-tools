@@ -9,7 +9,7 @@ Save the current session's plan file to the project's `.ai-reference/plans/` fol
 
 ## Instructions
 
-1. **Find the current plan file** - Look in the conversation context for references to a plan file path (typically `/home/silver/.claude/plans/<plan-name>.md`)
+1. **Find the current plan file** - Look in the conversation context for references to a plan file path (typically `~/.claude/plans/<plan-name>.md`)
 
 2. **Ask for a name** if not provided in arguments:
    - Use AskUserQuestion to get a short, descriptive kebab-case name

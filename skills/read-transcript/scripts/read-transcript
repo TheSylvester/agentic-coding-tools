@@ -16,6 +16,10 @@ Options:
     --inline-subagents  Recursively inline sub-agent transcripts
     --offset N          Skip first N entries (0-based)
     --limit N           Return only N entries
+    --budget N          Max output chars (default: 30000). Stops at last
+                        complete entry that fits. Use --all to bypass.
+    --tail              Read from the end of the transcript
+    --all               Bypass budget limit, dump everything
 """
 
 import json
@@ -284,8 +288,15 @@ def process_file(
     indent_level: int = 0,
     offset: int = 0,
     limit: Optional[int] = None,
+    budget: Optional[int] = 30000,
+    tail: bool = False,
 ) -> str:
-    """Process a single JSONL file to readable format."""
+    """Process a single JSONL file to readable format.
+
+    Budget-based output limiting: stops at the last complete entry that fits
+    within the character budget. Never cuts mid-entry. Prints a continuation
+    footer when truncated so the caller knows exactly how to get more.
+    """
     entries = []
     metadata = {}
 
@@ -311,42 +322,44 @@ def process_file(
             except json.JSONDecodeError:
                 continue
 
-    # Apply pagination
     total_entries = len(entries)
+
+    # Apply offset/limit slicing
     if offset or limit:
         end = offset + limit if limit else None
         entries = entries[offset:end]
 
-    output_lines = []
+    # Tail mode: reverse so we accumulate from the end
+    if tail and not offset:
+        entries = list(reversed(entries))
 
-    # Summary header
+    # --- Build header ---
+    header_lines = []
     if include_summary and metadata:
         is_subagent = metadata.get("is_sidechain", False)
         agent_id = metadata.get("agent_id", "")
 
         if is_subagent and agent_id:
-            output_lines.append(f"{indent_str}=== SUB-AGENT TRANSCRIPT ({agent_id}) ===")
+            header_lines.append(f"{indent_str}=== SUB-AGENT TRANSCRIPT ({agent_id}) ===")
         else:
-            output_lines.append(f"{indent_str}=== CLAUDE CODE TRANSCRIPT ===")
+            header_lines.append(f"{indent_str}=== CLAUDE CODE TRANSCRIPT ===")
 
         if metadata.get("cwd"):
-            output_lines.append(f"{indent_str}Dir: {metadata['cwd']}")
+            header_lines.append(f"{indent_str}Dir: {metadata['cwd']}")
         if metadata.get("git_branch"):
-            output_lines.append(f"{indent_str}Branch: {metadata['git_branch']}")
-        if entries:
-            first_ts = entries[0].get("timestamp", "")
-            last_ts = entries[-1].get("timestamp", "")
-            if first_ts:
-                output_lines.append(f"{indent_str}Started: {format_timestamp(first_ts)}")
-            if last_ts:
-                output_lines.append(f"{indent_str}Ended: {format_timestamp(last_ts)}")
-        if offset or limit:
-            output_lines.append(f"{indent_str}Entries: {len(entries)} (showing {offset}-{offset + len(entries) - 1} of {total_entries})")
-        else:
-            output_lines.append(f"{indent_str}Entries: {len(entries)}")
-        output_lines.append("")
+            header_lines.append(f"{indent_str}Branch: {metadata['git_branch']}")
+        header_lines.append(f"{indent_str}Total entries: {total_entries}")
+        header_lines.append("")
 
-    # Process entries
+    header = "\n".join(header_lines)
+    header_cost = len(header)
+
+    # --- Accumulate entries within budget ---
+    formatted_entries = []
+    chars_used = header_cost
+    entries_shown = 0
+    budget_exhausted = False
+
     for entry in entries:
         formatted = process_entry(
             entry,
@@ -357,10 +370,78 @@ def process_file(
             inline_subagents=inline_subagents,
             indent_level=indent_level,
         )
-        if formatted:
-            output_lines.append(formatted)
+        if not formatted:
+            continue
 
-    return "\n".join(output_lines)
+        entry_cost = len(formatted) + 1  # +1 for joining newline
+        if budget and (chars_used + entry_cost) > budget and entries_shown > 0:
+            budget_exhausted = True
+            break
+
+        formatted_entries.append(formatted)
+        chars_used += entry_cost
+        entries_shown += 1
+
+    # Tail mode: restore chronological order
+    if tail and not offset:
+        formatted_entries.reverse()
+
+    # --- Build output ---
+    output_parts = []
+    if header:
+        output_parts.append(header)
+
+    output_parts.extend(formatted_entries)
+
+    # --- Continuation footer ---
+    if budget_exhausted:
+        # Figure out where we stopped in terms of the original entry index
+        if tail and not offset:
+            # We were reading backwards; we showed the LAST entries_shown
+            # The earlier entries remain. Show how to get them.
+            remaining = total_entries - entries_shown
+            output_parts.append(f"\n{'─' * 40}")
+            output_parts.append(
+                f"Showing last {entries_shown} entries of {total_entries} "
+                f"(~{chars_used:,} chars)"
+            )
+            if remaining > 0:
+                output_parts.append(
+                    f"Earlier entries: --offset 0 --all  (or --budget {budget} without --tail)"
+                )
+        else:
+            stop_index = offset + entries_shown
+            remaining = total_entries - stop_index
+            output_parts.append(f"\n{'─' * 40}")
+            output_parts.append(
+                f"Showing entries {offset}–{stop_index - 1} of {total_entries} "
+                f"(~{chars_used:,} chars)"
+            )
+            if remaining > 0:
+                script = input_path.name
+                output_parts.append(
+                    f"Next page: --offset {stop_index}"
+                )
+    elif include_summary:
+        # Not truncated — show range for clarity
+        if tail and not offset:
+            output_parts.append(f"\n{'─' * 40}")
+            output_parts.append(
+                f"Showing all {entries_shown} entries (~{chars_used:,} chars)"
+            )
+        elif offset:
+            output_parts.append(f"\n{'─' * 40}")
+            output_parts.append(
+                f"Showing entries {offset}–{offset + entries_shown - 1} of {total_entries} "
+                f"(~{chars_used:,} chars)"
+            )
+        else:
+            output_parts.append(f"\n{'─' * 40}")
+            output_parts.append(
+                f"Showing all {entries_shown} entries (~{chars_used:,} chars)"
+            )
+
+    return "\n".join(output_parts)
 
 
 def main():
@@ -400,6 +481,18 @@ Examples:
     parser.add_argument(
         "--limit", type=int, default=None, help="Return only N entries"
     )
+    parser.add_argument(
+        "--budget", type=int, default=30000,
+        help="Max output characters (default: 30000). Stops at last complete entry that fits."
+    )
+    parser.add_argument(
+        "--tail", action="store_true",
+        help="Read from the end of the transcript (most recent first)"
+    )
+    parser.add_argument(
+        "--all", action="store_true", dest="show_all",
+        help="Bypass budget limit, dump everything"
+    )
 
     args = parser.parse_args()
 
@@ -421,6 +514,8 @@ Examples:
 
     include_tools = not args.no_tools
 
+    effective_budget = None if args.show_all else args.budget
+
     result = process_file(
         input_path,
         include_summary=args.summary,
@@ -430,6 +525,8 @@ Examples:
         inline_subagents=args.inline_subagents,
         offset=args.offset,
         limit=args.limit,
+        budget=effective_budget,
+        tail=args.tail,
     )
 
     print(result)

@@ -20,6 +20,7 @@
 set -euo pipefail
 
 MIN_VERSION="0.80.0"
+OUTPUT_DIR="/tmp/crispy-agents"
 
 # Version comparison: returns 0 if $1 >= $2
 version_gte() {
@@ -160,6 +161,11 @@ else
   CODEX_CMD+=("$PROMPT")
 fi
 
+# Set up persistent output file (survives Claude Code task cleanup)
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_FILE="${OUTPUT_DIR}/codex-agent-$(date +%s)-$$.log"
+echo "[output_file: $OUTPUT_FILE]" >&2
+
 # Run codex, show diagnostics on failure
 OUTPUT=$("${CODEX_CMD[@]}" 2>&1) || {
   EXIT_CODE=$?
@@ -183,6 +189,7 @@ if [[ -n "$CLEAN_OUTPUT" ]]; then
   echo "$CLEAN_OUTPUT"
 else
   # Fallback to full output if parsing fails
+  CLEAN_OUTPUT="$OUTPUT"
   echo "$OUTPUT"
 fi
 
@@ -191,3 +198,9 @@ if [[ -n "$SESSION_ID" ]]; then
   echo ""
   echo "[session_id: $SESSION_ID]"
 fi
+
+# Write to persistent output file
+{
+  echo "$CLEAN_OUTPUT"
+  [[ -n "$SESSION_ID" ]] && echo "" && echo "[session_id: $SESSION_ID]"
+} > "$OUTPUT_FILE"

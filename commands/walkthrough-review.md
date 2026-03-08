@@ -98,7 +98,7 @@ Invoke the `walkthrough-reviewer` agent via the Skill tool, passing
 the absolute file path from Phase 1:
 
 ```
-Skill: walkthrough-reviewer <absolute-path-to-walkthrough-prompt.md>
+Agent: walkthrough-reviewer <absolute-path-to-walkthrough-prompt.md>
 ```
 
 The reviewer agent will:

@@ -3,6 +3,8 @@ name: claude-transcript
 description: Analyze Claude Code transcripts (.jsonl). Use for searching history, extracting patterns, comparing sessions.
 tools: Read, Grep, Glob, Skill
 model: haiku
+skills:
+  - read-transcript
 ---
 
 You are a Claude Code transcript analyst.

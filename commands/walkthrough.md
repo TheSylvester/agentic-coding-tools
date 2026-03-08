@@ -1,48 +1,70 @@
 ---
-argument-hint: [impl-prompt-path OR target-code]
-description: Walk through actual code in a codebase, reading files and showing what's really there, pausing for questions at each milestone
+argument-hint: [topic, files, diff, module, plan, or any subject]
+description: Walk through anything — code, changes, designs, plans — chunk by chunk, pausing for the user to steer
 ---
 
 Walk me through: $ARGUMENTS
 
-**STOP** — do not deliver walkthrough content until approved.
+## Determine the subject
 
-## Plan Structure
+Figure out what's being walked through. The subject could be anything:
 
-Write to your plan file:
+- **Uncommitted changes / a diff** — run `git diff` (or `git diff --staged`) and chunk the changes
+- **A set of files or a module** — read the files, chunk by logical boundary
+- **A plan, design, or prompt file** — read it, chunk by section
+- **A codebase topic** (e.g. "how does session management work") — explore with Read/Grep/Glob, then chunk your findings
+- **Whatever the user described** — interpret $ARGUMENTS and start
 
-1. **Milestones** — numbered list of what you'll walk through
-2. **Key files** — paths you'll reference (with line numbers where helpful)
-3. **Key design points** — technical details, data structures, trade-offs
-4. **Scope** — what's in vs out
+**Do not enter plan mode. Do not pre-plan milestones. Just start.**
 
-Then call `ExitPlanMode`.
+Quickly orient yourself (read files, check the diff, grep for context), then
+begin delivering the first chunk. If the scope is ambiguous, state your
+interpretation in one sentence and start — the user will redirect if needed.
 
-## On Approval: Walkthrough Delivery
+## Chunking
 
-You ARE the walkthrough agent. For each milestone:
+Break the subject into **succinct, logical chunks**. Go sequentially —
+front to back, top to bottom, or in whatever linear order makes sense
+for the subject.
+
+Each chunk should be small enough to absorb in one read. Err on the side
+of too small — the user will say "continue" quickly if they want more.
+
+## Per-chunk delivery
 
 ### Code-first rule (MANDATORY)
 
-**The prompt tells you where to look. The code is what you present.** Before each milestone, read the actual source files. Walk the user through what you find there — not what the prompt *says* is there. The prompt may have stale line numbers, wrong names, or outdated descriptions. If the code differs, trust the code and say so.
+**Read actual source files before referencing them.** Present what's really
+in the code — not what you assume or remember. If something has changed,
+trust the code and say so.
 
-### Delivery
+### Format
 
-- **Read first, talk second** — open every file you're about to reference; present what's actually in them
-- **Always include `file:line` references** — user wants to jump to code in their editor
-- Explain conceptually (what, why, how it fits)
-- Show key types, interfaces, data flow with their locations
-- Illustrative snippets only — but always cite where to find the full code
-- Call out design decisions and trade-offs
-- **Pause after each milestone**: "Questions? Ready to continue?"
+- **Be succinct.** Explain what this chunk does, why, and how it fits.
+- **Always include `file:line` references** so the user can jump to code.
+- Show key types, interfaces, data flow with their locations.
+- Illustrative snippets only — cite where to find the full code.
+- Call out design decisions, trade-offs, or anything that smells off.
 
-Keep going until:
-- [ ] User understands the structure and responsibilities
-- [ ] User understands key concepts
-- [ ] All questions answered
-- [ ] User ready to approve implementation (or request changes)
+### Pause
 
-## File Output Mode
+After each chunk, **just stop.** Do not ask "Questions? Ready to continue?"
+or any variation. Simply end your message after the chunk content.
+
+The user drives the flow. They will say things like:
+- "continue" / "next" / "keep going" → deliver the next chunk
+- "note that as an action item and continue" → log it, move on
+- "focus more on X" → go deeper on X before continuing
+- "skip to Y" → jump ahead
+- specific questions → answer, then wait again
+
+## Action items
+
+If the user notes corrections, issues, or action items during the
+walkthrough, keep a running mental list. If they ask for a summary
+at the end, present all accumulated action items.
+
+## File output mode
 
 Only if user explicitly asks to "write a prompt file" or "save for later":
 

@@ -5,14 +5,18 @@ super-agent: SDK-based agent runner with full sub-agent capabilities.
 Reads prompt from PROMPT_FILE, args, or stdin and runs via the Agent SDK.
 Transcripts land in ~/.claude/projects/<cwd-slug>/.
 
-SDK Version: Requires claude-agent-sdk >= 0.1.19
+SDK Version: Requires claude-agent-sdk >= 0.1.45
 """
 
 import os
 import sys
 import asyncio
 import argparse
+import time
+import tempfile
 from pathlib import Path
+
+OUTPUT_DIR = Path("/tmp/crispy-agents")
 
 from claude_agent_sdk import query, ClaudeAgentOptions
 from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
@@ -29,7 +33,7 @@ def get_prompt(args: list[str]) -> str:
     return ""
 
 
-async def run(prompt: str, resume: str | None, fork: bool, chrome: bool, no_persist: bool = False) -> int:
+async def run(prompt: str, resume: str | None, fork: bool, chrome: bool, no_persist: bool = False, resume_at: str | None = None) -> int:
     model = os.environ.get("SUPER_AGENT_MODEL")  # keep for drop-in compatibility
     bypass = os.environ.get("BYPASS_PERMISSIONS") == "1"
     debug = os.environ.get("SUPER_AGENT_DEBUG") == "1"
@@ -44,40 +48,60 @@ async def run(prompt: str, resume: str | None, fork: bool, chrome: bool, no_pers
         model=model,  # None if not set, which uses default
         resume=resume,  # Session ID to resume (if provided)
         fork_session=fork,  # Fork instead of continue when resuming
+        env={
+            "CLAUDECODE": "",  # Allow nesting: SDK 0.1.45+ bundled CLI blocks nested sessions
+            # Isolate nested CLI's temp dir so it doesn't purge the parent's
+            # Bash tool output files on startup (they share /tmp/claude-<uid>/<slug>/tasks/).
+            "CLAUDE_CODE_TMPDIR": tempfile.mkdtemp(prefix="claude-sdk-"),
+        },
         extra_args={
             **({"chrome": None} if chrome else {}),
             **({"no-session-persistence": None} if no_persist else {}),
+            **({"resume-session-at": resume_at} if resume_at else {}),
         },
     )
+
+    # Set up persistent output file (survives Claude Code task cleanup)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = OUTPUT_DIR / f"super-agent-{int(time.time())}-{os.getpid()}.log"
+    output_file = open(output_path, "w", encoding="utf-8")
+    print(f"[output_file: {output_path}]", file=sys.stderr)
 
     exit_code = 0
     session_id = None
 
-    async for message in query(prompt=prompt, options=opts):
-        # Stream assistant text content to stdout
-        if isinstance(message, AssistantMessage):
-            for block in message.content:
-                if isinstance(block, TextBlock):
-                    print(block.text, end="", flush=True)
+    try:
+        async for message in query(prompt=prompt, options=opts):
+            # Stream assistant text content to stdout and output file
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        print(block.text, end="", flush=True)
+                        output_file.write(block.text)
+                        output_file.flush()
 
-        # Handle final result - session_id is available here
-        if isinstance(message, ResultMessage):
-            session_id = message.session_id
-            # Ensure final newline after streaming text
-            print()
+            # Handle final result - session_id is available here
+            if isinstance(message, ResultMessage):
+                session_id = message.session_id
+                # Ensure final newline after streaming text
+                print()
+                output_file.write("\n")
 
-            # Always output session_id to stdout (uniform with codex/gemini agents)
-            if session_id:
-                print(f"\n[session_id: {session_id}]")
+                # Always output session_id to stdout (uniform with codex/gemini agents)
+                if session_id:
+                    print(f"\n[session_id: {session_id}]")
+                    output_file.write(f"\n[session_id: {session_id}]\n")
 
-            if debug:
-                print(f"[Session: {session_id}]", file=sys.stderr)
-                if message.total_cost_usd:
-                    print(f"[Cost: ${message.total_cost_usd:.4f}]", file=sys.stderr)
+                if debug:
+                    print(f"[Session: {session_id}]", file=sys.stderr)
+                    if message.total_cost_usd:
+                        print(f"[Cost: ${message.total_cost_usd:.4f}]", file=sys.stderr)
 
-            if message.is_error:
-                print(f"[Agent finished with: {message.subtype}]", file=sys.stderr)
-                exit_code = 1
+                if message.is_error:
+                    print(f"[Agent finished with: {message.subtype}]", file=sys.stderr)
+                    exit_code = 1
+    finally:
+        output_file.close()
 
     return exit_code
 
@@ -99,6 +123,7 @@ Examples:
   PROMPT_FILE=task.md super-agent
   cat task.md | super-agent
   SESSION_ID=abc-123 super-agent --fork "Continue the analysis"
+  super-agent --fork --resume abc-123 --resume-at <msg-uuid> "Continue from here"
         """,
     )
     parser.add_argument("prompt", nargs="*", help="Prompt text (or use PROMPT_FILE/stdin)")
@@ -122,6 +147,11 @@ Examples:
         action="store_true",
         help="Don't save session to disk (cannot be resumed)",
     )
+    parser.add_argument(
+        "--resume-at",
+        metavar="MESSAGE_ID",
+        help="Fork at a specific message UUID (requires --fork)",
+    )
     args = parser.parse_args()
 
     prompt = get_prompt(args.prompt)
@@ -137,6 +167,11 @@ Examples:
         print("Error: --fork requires SESSION_ID env var or --resume flag", file=sys.stderr)
         return 1
 
+    # Validate --resume-at requires --fork
+    if args.resume_at and not args.fork:
+        print("Error: --resume-at requires --fork mode", file=sys.stderr)
+        return 1
+
     # Chrome enabled by default, can be disabled via flag or env var
     use_chrome = not args.no_chrome and os.environ.get("SUPER_AGENT_CHROME") != "0"
 
@@ -147,6 +182,7 @@ Examples:
             fork=args.fork,
             chrome=use_chrome,
             no_persist=args.no_persist,
+            resume_at=args.resume_at,
         ))
     except KeyboardInterrupt:
         return 130

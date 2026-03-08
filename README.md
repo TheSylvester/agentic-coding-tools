@@ -1,6 +1,6 @@
 # Agentic Coding Tools
 
-Stop losing context when Claude hits limits. Hand off tasks to fresh agents with full specs automatically synthesized from your conversation.
+A Claude Code marketplace plugin for multi-agent orchestration, prompt synthesis, and code review. Delegate complex tasks to fresh agents, run adversarial multi-vendor reviews, and automate browser-based QA — all from within Claude Code.
 
 ## Quick Example
 
@@ -24,68 +24,103 @@ Or install individual skills:
 
 ```bash
 /plugin install super-agent
-/plugin install chrome-screenshot
+/plugin install council
 ```
 
 ## Core Workflows
 
-### Handoff Pattern
+### Agent Orchestration
 
-When context gets heavy, synthesize a prompt and hand off to a fresh agent:
+Spawn, resume, and coordinate agents across vendors:
 
-- `/handoff-prompt-to super-agent` — Full spec, fresh execution
-- `/pair-prompt-to super-agent` — Collaborative pair-programming mode
-- `/reflect` — Validate your prompts before execution
+- **`super-agent`** — SDK-based Claude agent with full Task tool access; can spawn nested sub-agents
+- **`council`** — Multi-agent debate orchestrator with parallel panels and Chair synthesis
+- **`codex-agent`** / **`gemini-agent`** / **`cursor-agent`** — Vendor CLI wrappers with resume support
 
-### Phased Execution
+### Prompt Synthesis
 
-For large tasks that exceed single-agent capacity:
+Synthesize self-contained prompts so fresh agents can execute without token debt:
 
-- `/build-prompt-chain` — Decompose into phases with orchestration file
-- Execute each phase with `/super-agent`
+- `/handoff-prompt-to` — Full implementation spec for a fresh agent (auto-decomposes large tasks)
+- `/pair-prompt-to` — Collaborative pair-programming spec for a new agent
+- `/reflect` — Validate prompts against conversation + codebase before execution
+- **`super-implement`** — Transform plans into execution-ready prompt artifacts (single, parallel, or chained)
+- **`build-prompt-chain`** — Decompose monolithic prompts into phased chains with orchestration
+
+### Code Review
+
+From single-agent review to multi-vendor adversarial analysis:
+
+- `/review` — Code review for uncommitted changes, staged changes, files, or PRs
+- `/multi-agent-review` — Multi-vendor adversarial review with parallel agents and iterative pushback
+- `/swarm-think` — Dispatch super-agent + codex-agent for adversarial analysis
+
+### Walkthroughs & Specs
+
+Explore code and build specs interactively:
+
+- `/walkthrough` — Walk through code, changes, designs, or plans chunk by chunk
+- `/walkthrough-review` — Generate walkthrough prompt + agent design review
+- **`spec-mode`** — Interactive spec-building through conversation with a living plan file
 
 ### Browser Automation
 
-- `browser-qa` agent — Visual UI testing and verification
-- `ui-clone` agent — Pixel-perfect HTML/CSS reproductions
-- `/chrome-screenshot` — Extract screenshots from session transcripts
+- **`browser-qa`** agent — Visual UI testing and verification via Chrome automation
+- **`ui-clone`** agent — Pixel-perfect HTML/CSS/JS website reproduction from visual observation
+- **`chrome-screenshot`** — Extract and save browser screenshots from session transcripts
+
+### Utilities
+
+- **`read-transcript`** — Token-efficient Claude Code transcript (.jsonl) reader with budget-limited output
+- **`claude-transcript`** agent — Analyze transcripts: search history, extract patterns, compare sessions
+- **`save-plan`** — Save plans to `.ai-reference/` for future reference
 
 ## What's Included
 
 ### Skills
 
-| Skill                | Description                                                     |
-| -------------------- | --------------------------------------------------------------- |
-| `super-agent`        | SDK-based Claude agent with full Task tool access               |
-| `cursor-agent`       | Cursor IDE agent wrapper with resume support                    |
-| `gemini-agent`       | Gemini CLI wrapper with resume support                          |
-| `git-worktree`       | Create worktrees with auto-symlinked local files (.env*, .ai-*) |
-| `build-prompt-chain` | Transform monolithic prompts into phased chains                 |
-| `chrome-screenshot`  | Extract browser screenshots from transcripts                    |
-| `read-transcript`    | Token-efficient transcript reading                              |
+| Skill | Description |
+| --- | --- |
+| `super-agent` | SDK-based Claude agent with full Task tool access and nested sub-agent support |
+| `council` | Multi-agent debate orchestrator with parallel panels and Chair synthesis |
+| `super-implement` | Transform plans into execution-ready prompt artifacts (single, parallel, or chain) |
+| `build-prompt-chain` | Decompose monolithic prompts into phased chains with orchestration |
+| `spec-mode` | Interactive spec-building through conversation |
+| `codex-agent` | Codex CLI wrapper for non-interactive runs with resume support |
+| `gemini-agent` | Gemini CLI wrapper for non-interactive runs with resume support |
+| `cursor-agent` | Cursor IDE agent wrapper for non-interactive runs with resume support |
+| `chrome-screenshot` | Extract browser screenshots from session transcripts |
+| `read-transcript` | Token-efficient transcript reader with budget-limited output |
+| `save-plan` | Save plans to `.ai-reference/` for future reference |
 
 ### Commands
 
-| Command                  | Description                                        |
-| ------------------------ | -------------------------------------------------- |
-| `/handoff-prompt-to`     | Synthesize implementation prompts for fresh agents |
-| `/pair-prompt-to`        | Create specs for pair-programming sessions         |
-| `/walkthrough-prompt-to` | Generate design walkthrough prompts                |
-| `/reflect`               | Validate prompts against conversation + codebase   |
+| Command | Description |
+| --- | --- |
+| `/handoff-prompt-to` | Synthesize implementation prompts for fresh agents |
+| `/pair-prompt-to` | Create specs for pair-programming sessions |
+| `/walkthrough` | Walk through code, changes, designs, or plans chunk by chunk |
+| `/walkthrough-review` | Generate walkthrough prompt + agent design review |
+| `/reflect` | Validate prompts against conversation + codebase |
+| `/review` | Code review for uncommitted changes, staged changes, files, or PRs |
+| `/multi-agent-review` | Multi-vendor adversarial review with parallel agents |
+| `/swarm-think` | Dispatch super-agent + codex-agent for adversarial analysis |
 
 ### Agents
 
-| Agent        | Description                              |
-| ------------ | ---------------------------------------- |
-| `browser-qa` | Visual UI testing via browser automation |
-| `ui-clone`   | Pixel-perfect website reproduction       |
+| Agent | Description |
+| --- | --- |
+| `browser-qa` | Visual UI testing and verification via browser automation |
+| `ui-clone` | Pixel-perfect HTML/CSS/JS website reproduction |
+| `claude-transcript` | Analyze Claude Code transcripts (.jsonl) |
+| `walkthrough-reviewer` | Holistic design critic for walkthrough reviews |
 
 ## Cross-Platform
 
-Same prompt synthesis tools for other AI assistants:
+Same prompt synthesis commands for other AI coding assistants:
 
-| Platform   | Setup                                          |
-| ---------- | ---------------------------------------------- |
+| Platform | Setup |
+| --- | --- |
 | Cursor IDE | `cp -r .cursor/commands/* ~/.cursor/commands/` |
 | Gemini CLI | `cp -r .agent/workflows/* ~/.agent/workflows/` |
 
@@ -132,14 +167,6 @@ ln -s ../.. plugins/marketplaces/agentic-coding-tools
 5. Validate: `claude plugin validate .`
 
 </details>
-
-## Marketplace
-
-This repo IS the marketplace.
-
-- Validate: `claude plugin validate .`
-- Symlink setup: `mkdir -p plugins/marketplaces && ln -s ../.. plugins/marketplaces/agentic-coding-tools`
-- Test: `/plugin`
 
 ## License
 

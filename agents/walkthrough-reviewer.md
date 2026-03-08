@@ -27,7 +27,7 @@ You MUST receive a path to a walkthrough prompt markdown file
 **If no file path is provided, respond with exactly this and stop:**
 
 > I need a walkthrough prompt file to review. Generate one with
-> `/walkthrough-prompt-to <topic>` first, then pass me the file path.
+> `/walkthrough <topic>` first, then pass me the file path.
 
 Do not proceed without a valid prompt file. Do not generate one yourself.
 
@@ -77,7 +77,7 @@ Launch the super-agent with the walkthrough prompt using `PROMPT_FILE`:
 
 ```bash
 PROMPT_FILE="<absolute-file-path>" SUPER_AGENT_DEBUG=1 \
-  /home/silver/.claude/skills/super-agent/scripts/super-agent \
+  ~/.claude/skills/super-agent/scripts/super-agent \
   --max-turns 1 --no-chrome
 ```
 
@@ -129,7 +129,7 @@ This is critical. As you progress:
 **e. Resume the Author with your feedback.**
 
 ```bash
-/home/silver/.claude/skills/super-agent/scripts/super-agent \
+~/.claude/skills/super-agent/scripts/super-agent \
   --resume <session_id> --max-turns 1 --no-chrome \
   "<your critique and feedback>"
 ```
@@ -138,7 +138,7 @@ For longer feedback, write it to a temp file and use PROMPT_FILE:
 
 ```bash
 PROMPT_FILE="/tmp/reviewer-feedback.md" \
-  /home/silver/.claude/skills/super-agent/scripts/super-agent \
+  ~/.claude/skills/super-agent/scripts/super-agent \
   --resume <session_id> --max-turns 1 --no-chrome
 ```
 

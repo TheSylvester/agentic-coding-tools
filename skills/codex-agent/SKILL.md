@@ -6,19 +6,19 @@ allowed-tools: Bash
 
 # Codex Agent (wrapper)
 
-## IMPORTANT: Execution Instructions
+## Execution
 
-**This script runs synchronously and returns output directly. Do NOT run it in the background.**
+Works in both foreground and background:
 
-When invoking via Bash, you MUST:
-1. Use `timeout: 600000` (10 minutes) — codex runs can take several minutes
-2. Run it as a **foreground** command (do NOT use `run_in_background`)
-3. Read the output directly from the Bash result — no need to poll or check later
-
-Example Bash invocation:
 ```
+# Foreground (blocks until done — use timeout since runs can take minutes)
 Bash(command: "~/.claude/skills/codex-agent/scripts/codex-agent Your prompt here", timeout: 600000)
+
+# Background (non-blocking — check output later with TaskOutput)
+Bash(command: "~/.claude/skills/codex-agent/scripts/codex-agent Your prompt here", run_in_background: true)
 ```
+
+Background is preferred when launching multiple agents in parallel.
 
 ---
 
@@ -100,6 +100,10 @@ Returns plain text response followed by the session ID:
 ```
 
 Capture the session ID to continue the conversation with `--resume <uuid>`.
+
+Every run also saves output to `/tmp/crispy-agents/codex-agent-<timestamp>-<pid>.log`.
+The path is printed to stderr as `[output_file: ...]`. If `TaskOutput` fails
+to capture output from a background run, read this file instead.
 
 ## Troubleshooting
 

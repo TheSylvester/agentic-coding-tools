@@ -1,56 +1,44 @@
 ---
 name: read-transcript
-description: ALWAYS use this skill instead of Read when reading Claude Code transcript files (.jsonl in ~/.claude/projects/, ~/.claude/history.jsonl, or paths containing 'transcript'). Token-efficient format that extracts USER/ASSISTANT exchanges and tool summaries, strips metadata.
+description: This skill should be used instead of the Read tool when reading Claude Code transcript files (.jsonl in ~/.claude/projects/, ~/.claude/history.jsonl, or paths containing 'transcript'). This skill should be used when the user asks to "read this transcript", "analyze this session", "what happened in this session", "review this Claude Code session", "find a transcript", or when any .jsonl file in ~/.claude/projects/ needs to be read. Token-efficient format that extracts USER/ASSISTANT exchanges and tool summaries, strips metadata, with budget-based output limiting.
 allowed-tools: Bash
 ---
 
 # Read Transcript
 
-Token-efficient reader for Claude Code `.jsonl` transcript files. Strips metadata, extracts conversation flow.
+Token-efficient reader for Claude Code `.jsonl` transcript files. Strips metadata, extracts conversation flow. Output is budget-limited by default (~30K chars) — never dumps unbounded data.
 
-## Auto-Trigger Conditions
+## When to Use
 
-**CRITICAL**: Use this skill AUTOMATICALLY instead of Read for any transcript files.
+Use **instead of Read** for any transcript file:
 
-**File Patterns:**
-- `~/.claude/projects/*/<UUID>.jsonl` - main session transcripts
-- `~/.claude/projects/*/agent-*.jsonl` - sub-agent transcripts (at project root)
-- `~/.claude/projects/*/<UUID>/subagents/agent-*.jsonl` - nested sub-agent transcripts
-- `~/.claude/history.jsonl` - ⚠️ command history (different format, not supported)
-- `*/diffs/*/transcript_cycle.jsonl` - transcript cycle files
+- `~/.claude/projects/*/<UUID>.jsonl` — main session transcripts
+- `~/.claude/projects/*/agent-*.jsonl` — sub-agent transcripts
+- `~/.claude/projects/*/<UUID>/subagents/agent-*.jsonl` — nested sub-agent transcripts
+- `*/diffs/*/transcript_cycle.jsonl` — transcript cycle files
 - Any `.jsonl` when context suggests Claude Code conversation
 
-**User Phrases:**
-- "read/analyze this transcript"
-- "what happened in this session"
-- "review this Claude Code session"
-- "find a transcript" / "find me a transcript"
+**Not supported:** `~/.claude/history.jsonl` (command history, different format).
 
-**Only use Read directly if:**
-- User explicitly needs raw JSONL structure
-- Debugging format issues
-- Inspecting specific metadata fields
+**Use Read directly only when:** raw JSONL structure is needed, debugging format issues, or inspecting specific metadata fields.
 
 ## Usage
 
 ```bash
-# Basic - outputs to stdout
+# Default — auto-limited to ~30K chars
 .claude/skills/read-transcript/scripts/read-transcript /path/to/transcript.jsonl
 
-# With metadata header (dir, branch, timestamps, entry count)
+# Most recent activity first
+.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --tail
+
+# With metadata header (dir, branch, entry count)
 .claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --summary
 
-# Text only (no tool calls)
-.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --no-tools
+# Continue from where output stopped (offset from footer)
+.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --offset 42
 
-# Compact format
-.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --compact
-
-# Include sub-agent transcripts inline
-.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --inline-subagents
-
-# Pagination (like Read tool's offset/limit)
-.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --offset 10 --limit 5
+# Dump everything (bypass budget)
+.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --all
 ```
 
 ## Options
@@ -62,35 +50,28 @@ Token-efficient reader for Claude Code `.jsonl` transcript files. Strips metadat
 | `--compact` | Denser output format |
 | `--inline-subagents` | Recursively inline sub-agent transcripts |
 | `--thinking` | Include thinking blocks (usually skip to save tokens) |
-| `--offset N` | Skip first N entries (0-based, like Read tool) |
-| `--limit N` | Return only N entries (like Read tool)
+| `--offset N` | Skip first N entries (0-based) |
+| `--limit N` | Return only N entries |
+| `--budget N` | Max output chars (default: 30000). Stops at last complete entry. |
+| `--tail` | Read from the end of the transcript (most recent activity) |
+| `--all` | Bypass budget limit, dump everything |
 
-## When to Use
+## Budget-Based Output Limiting
 
-**Auto-trigger on:**
-- Any `.jsonl` file in `~/.claude/projects/`
-- User mentions "transcript", "session", or "conversation history"
+Output is capped at ~30,000 characters by default. The script never cuts mid-entry — it stops at the last complete entry that fits, then prints a continuation footer:
 
-**Also useful for:**
-- Analyzing what happened in a Claude Code session
-- Reviewing conversation flow without metadata clutter
-- Extracting content from transcripts for documentation
-- Summarizing or understanding transcript content
-
-## Pagination
-
-Supports Read-like pagination for large transcripts:
-
-```bash
-# Entries 10-14 (0-based indexing)
-.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --offset 10 --limit 5 --summary
-# Output: "Entries: 5 (showing 10-14 of 745)"
+```
+────────────────────────────────────────
+Showing entries 0–41 of 312 (~29,847 chars)
+Next page: --offset 42
 ```
 
-Use `--summary` with pagination to see the range displayed.
+To continue, pass the `--offset` value from the footer on the next call.
 
-## When NOT to Use
+**Tail mode** reads from the end — for "what just happened?" scenarios:
 
-- Debugging JSONL format issues (use Read directly)
-- Inspecting specific metadata fields (sessionId, tokens, etc.)
-- When user explicitly wants raw JSON structure
+```bash
+.claude/skills/read-transcript/scripts/read-transcript transcript.jsonl --tail --summary
+```
+
+Adjust the budget with `--budget N` or bypass entirely with `--all`.

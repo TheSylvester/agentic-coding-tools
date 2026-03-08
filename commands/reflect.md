@@ -48,6 +48,14 @@ Make any refinements to ensure:
 - [ ] Nothing we discussed is missing from the artifacts/plans
 - [ ] No scope creep beyond what we decided
 
+**Execution structure:**
+- [ ] Plans use sub-agents for parallel/independent work (multiple Task calls in one message, not sequential)
+- [ ] Exploration and research steps use sub-agents (isolated context, synthesized findings)
+- [ ] If the plan involves significant code changes, consider adding a simplification/refactoring pass before testing to review changed code for reuse, quality, and efficiency
+- [ ] Testing/typecheck/lint steps come after any refactoring passes
+
 ---
 
-Directly update the artifacts with refinements required. End with "REFLECT COMPLETE" to signal verification is done.
+Directly update the artifacts with refinements required.
+
+End with "REFLECT COMPLETE" to signal verification is done.

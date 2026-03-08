@@ -215,8 +215,9 @@ function rgbToHex(rgb) {
 ### 3.1 Read Base Template
 
 ```
-Read the base template from:
-/home/silver/dev/claude-transcript-monitor/.ai-reference/ui-clone-templates/base-template.html
+Generate the HTML from scratch using the extracted CSS values.
+If a base template exists at `.ai-reference/ui-clone-templates/base-template.html`
+in the current project, use it. Otherwise, build the HTML structure directly.
 ```
 
 ### 3.2 Replace CSS Variable Placeholders

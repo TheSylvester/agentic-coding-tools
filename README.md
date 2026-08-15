@@ -1,173 +1,106 @@
 # Agentic Coding Tools
 
-A Claude Code marketplace plugin for multi-agent orchestration, prompt synthesis, and code review. Delegate complex tasks to fresh agents, run adversarial multi-vendor reviews, and automate browser-based QA — all from within Claude Code.
+Five [Agent Skills](https://agentskills.io) for Claude Code, for delegating
+work to fresh agents and reviewing it across two vendors.
 
-## Quick Example
+They are the skills I actually use every day, not a catalogue. Each one is a
+plain `SKILL.md`; the two agent wrappers add a single zero-dependency Node
+script each.
 
-```
-You: "Build the auth system we discussed"
-/handoff-prompt-to super-agent
-
-→ Synthesizes a complete implementation spec from conversation context
-→ Spawns a fresh agent with the spec
-→ Agent executes with full context, no token debt
-```
-
-## Installation
+## Install
 
 ```bash
-/plugin marketplace add TheSylvester/agentic-coding-tools
-/plugin install agentic-coding-tools
+npx github:TheSylvester/agentic-coding-tools
 ```
 
-Or install individual skills:
+That copies every skill into `~/.claude/skills/`. Restart Claude Code
+afterwards to pick them up.
+
+Pick and choose, or install somewhere else:
 
 ```bash
-/plugin install super-agent
-/plugin install council
+npx github:TheSylvester/agentic-coding-tools --list          # see what's on offer
+npx github:TheSylvester/agentic-coding-tools handoff          # just one
+npx github:TheSylvester/agentic-coding-tools --project        # into ./.claude/skills
+npx github:TheSylvester/agentic-coding-tools --dir <path>     # anywhere
+npx github:TheSylvester/agentic-coding-tools --force          # overwrite existing
+npx github:TheSylvester/agentic-coding-tools --dry-run        # change nothing
 ```
 
-## Core Workflows
+Prefer to do it by hand? Copy any folder from `skills/` into
+`~/.claude/skills/` and you are done — the documented commands already assume
+that location. The installer only exists to get the paths right when you
+install somewhere else, or on Windows where `~` does not expand outside a
+POSIX shell.
 
-### Agent Orchestration
-
-Spawn, resume, and coordinate agents across vendors:
-
-- **`super-agent`** — SDK-based Claude agent with full Task tool access; can spawn nested sub-agents
-- **`council`** — Multi-agent debate orchestrator with parallel panels and Chair synthesis
-- **`codex-agent`** / **`gemini-agent`** / **`cursor-agent`** — Vendor CLI wrappers with resume support
-
-### Prompt Synthesis
-
-Synthesize self-contained prompts so fresh agents can execute without token debt:
-
-- `/handoff-prompt-to` — Full implementation spec for a fresh agent (auto-decomposes large tasks)
-- `/pair-prompt-to` — Collaborative pair-programming spec for a new agent
-- `/reflect` — Validate prompts against conversation + codebase before execution
-- **`super-implement`** — Transform plans into execution-ready prompt artifacts (single, parallel, or chained)
-- **`build-prompt-chain`** — Decompose monolithic prompts into phased chains with orchestration
-
-### Code Review
-
-From single-agent review to multi-vendor adversarial analysis:
-
-- `/review` — Code review for uncommitted changes, staged changes, files, or PRs
-- `/multi-agent-review` — Multi-vendor adversarial review with parallel agents and iterative pushback
-- `/swarm-think` — Dispatch super-agent + codex-agent for adversarial analysis
-
-### Walkthroughs & Specs
-
-Explore code and build specs interactively:
-
-- `/walkthrough` — Walk through code, changes, designs, or plans chunk by chunk
-- `/walkthrough-review` — Generate walkthrough prompt + agent design review
-- **`spec-mode`** — Interactive spec-building through conversation with a living plan file
-
-### Browser Automation
-
-- **`browser-qa`** agent — Visual UI testing and verification via Chrome automation
-- **`ui-clone`** agent — Pixel-perfect HTML/CSS/JS website reproduction from visual observation
-- **`chrome-screenshot`** — Extract and save browser screenshots from session transcripts
-
-### Utilities
-
-- **`read-transcript`** — Token-efficient Claude Code transcript (.jsonl) reader with budget-limited output
-- **`claude-transcript`** agent — Analyze transcripts: search history, extract patterns, compare sessions
-- **`save-plan`** — Save plans to `.ai-reference/` for future reference
-
-## What's Included
-
-### Skills
-
-| Skill | Description |
-| --- | --- |
-| `super-agent` | SDK-based Claude agent with full Task tool access and nested sub-agent support |
-| `council` | Multi-agent debate orchestrator with parallel panels and Chair synthesis |
-| `super-implement` | Transform plans into execution-ready prompt artifacts (single, parallel, or chain) |
-| `build-prompt-chain` | Decompose monolithic prompts into phased chains with orchestration |
-| `spec-mode` | Interactive spec-building through conversation |
-| `codex-agent` | Codex CLI wrapper for non-interactive runs with resume support |
-| `gemini-agent` | Gemini CLI wrapper for non-interactive runs with resume support |
-| `cursor-agent` | Cursor IDE agent wrapper for non-interactive runs with resume support |
-| `chrome-screenshot` | Extract browser screenshots from session transcripts |
-| `read-transcript` | Token-efficient transcript reader with budget-limited output |
-| `save-plan` | Save plans to `.ai-reference/` for future reference |
-
-### Commands
-
-| Command | Description |
-| --- | --- |
-| `/handoff-prompt-to` | Synthesize implementation prompts for fresh agents |
-| `/pair-prompt-to` | Create specs for pair-programming sessions |
-| `/walkthrough` | Walk through code, changes, designs, or plans chunk by chunk |
-| `/walkthrough-review` | Generate walkthrough prompt + agent design review |
-| `/reflect` | Validate prompts against conversation + codebase |
-| `/review` | Code review for uncommitted changes, staged changes, files, or PRs |
-| `/multi-agent-review` | Multi-vendor adversarial review with parallel agents |
-| `/swarm-think` | Dispatch super-agent + codex-agent for adversarial analysis |
-
-### Agents
-
-| Agent | Description |
-| --- | --- |
-| `browser-qa` | Visual UI testing and verification via browser automation |
-| `ui-clone` | Pixel-perfect HTML/CSS/JS website reproduction |
-| `claude-transcript` | Analyze Claude Code transcripts (.jsonl) |
-| `walkthrough-reviewer` | Holistic design critic for walkthrough reviews |
-
-## Cross-Platform
-
-Same prompt synthesis commands for other AI coding assistants:
-
-| Platform | Setup |
-| --- | --- |
-| Cursor IDE | `cp -r .cursor/commands/* ~/.cursor/commands/` |
-| Gemini CLI | `cp -r .agent/workflows/* ~/.agent/workflows/` |
-
----
-
-<details>
-<summary><strong>Development</strong></summary>
-
-This repo is both a Claude Code config directory AND a marketplace source.
-
-### Structure
-
-```
-~/.claude/                              # Can be this repo
-├── .claude-plugin/
-│   ├── plugin.json                     # Plugin metadata
-│   └── marketplace.json                # Lists all installable plugins
-├── skills/                             # Individual skills
-│   └── <skill-name>/
-│       ├── SKILL.md                    # Documentation + frontmatter
-│       ├── .claude-plugin/plugin.json  # Makes it individually installable
-│       └── scripts/<skill-name>        # Executable (if any)
-├── commands/                           # Slash commands (.md files)
-├── agents/                             # Subagent definitions (.md files)
-└── plugins/                            # GITIGNORED - for installed plugins
-    └── marketplaces/
-        └── agentic-coding-tools → ../.. (symlink to root)
-```
-
-### Local Setup
+The layout is also compatible with Vercel's generic skills installer, if that
+is already part of your workflow:
 
 ```bash
-# One-time symlink setup
-mkdir -p plugins/marketplaces
-ln -s ../.. plugins/marketplaces/agentic-coding-tools
+npx skills@latest add TheSylvester/agentic-coding-tools
 ```
 
-### Adding a Skill
+Use one route, not several — installing twice leaves you with duplicate skills.
 
-1. Create `skills/<name>/SKILL.md` with YAML frontmatter
-2. Add `skills/<name>/.claude-plugin/plugin.json`
-3. Add executable to `skills/<name>/scripts/<name>` (if needed)
-4. Add entry to `.claude-plugin/marketplace.json`
-5. Validate: `claude plugin validate .`
+## The skills
 
-</details>
+| Skill | What it does | Needs |
+| --- | --- | --- |
+| **`handoff`** | Turns the current conversation into self-contained implementation prompt(s) for an agent with an empty context window. Decomposes into a phased chain or a parallel set when the task is too big for one. | nothing (a phased chain can drive `claude-agent`) |
+| **`fusionthink`** | Multi-vendor adversarial review. Sends one identical brief to a Claude reviewer and a Codex reviewer, verifies every claim against the real code, pushes back on weak findings, and makes each vendor settle the other's disputes. Can loop fix-and-re-review until both agree. | `claude-agent` + `codex-agent`, both CLIs |
+| **`claude-agent`** | Runs the Claude Code CLI non-interactively as a child agent. Prompt via args, file or stdin; true session resume; opt-in liveness monitor. | Node 18+, `claude` |
+| **`codex-agent`** | Runs the OpenAI Codex CLI non-interactively as a child agent. Same contract as `claude-agent`, so both can be handed the same brief. | Node 18+, `codex` |
+| **`point-by-point`** | Makes the assistant explain something one point at a time and stop after each for questions. | nothing |
+
+`handoff` and `point-by-point` are pure prose — they work in any agent that
+reads `SKILL.md`. The other three shell out to vendor CLIs.
+
+## Vendor CLIs
+
+Only needed for `claude-agent`, `codex-agent` and `fusionthink`:
+
+```bash
+npm install -g @anthropic-ai/claude-code    # for claude-agent
+npm install -g @openai/codex && codex login # for codex-agent
+```
+
+## Safety
+
+`claude-agent` and `codex-agent` launch **autonomous agents with permission
+prompts and sandboxing disabled** — `bypassPermissions` and
+`--dangerously-bypass-approvals-and-sandbox` respectively. A non-interactive
+run has nobody available to approve anything, so this is what makes them
+useful, and it is also what makes them dangerous. The child agent can read,
+write and execute in whatever directory you launch it from.
+
+Only hand these wrappers briefs you would be willing to run yourself.
+`claude-agent` honors `CLAUDE_PERMISSION_MODE` if you want something stricter.
+
+`fusionthink` launches both of them, unattended, in the background.
+
+## Platform support
+
+Linux, macOS, WSL, and Windows — including native PowerShell and cmd. The two
+wrappers are Node scripts with no dependencies beyond Node 18+, so there is no
+requirement for bash, `jq`, `python3`, `uuidgen`, GNU `grep -P` or GNU
+`sort -V`. Every prompt reaches the child CLI on stdin rather than through
+argv, which keeps briefs byte-exact past the ~128KB argument-length limit and
+avoids platform command-line quoting entirely.
+
+Two things to know on Windows:
+
+- The `VAR=value command` prefix used in the examples is POSIX shell syntax.
+  In PowerShell, set `$env:PROMPT_FILE="task.md"` on its own line first.
+- `fusionthink` orchestrates through your agent's shell, so it wants a POSIX
+  shell (WSL or Git Bash). The wrappers it calls do not.
+
+## Run logs
+
+Each wrapper run writes its clean reply and session id to a log file and prints
+the path to stderr as `[output_file: ...]`. Read the path that was printed
+rather than globbing for the newest file — parallel runs share the directory.
+Override the location with `AGENT_LOG_DIR`.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

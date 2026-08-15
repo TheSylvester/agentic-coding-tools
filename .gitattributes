@@ -1,0 +1,12 @@
+# Normalize to LF in the repository. Without this, a Windows clone with the
+# default core.autocrlf=true rewrites script line endings to CRLF, which breaks
+# shebangs and any line-anchored parsing.
+* text=auto eol=lf
+
+# Scripts are executed, never edited in a Windows-only editor.
+skills/**/scripts/** text eol=lf
+bin/** text eol=lf
+
+# Windows-native files that genuinely want CRLF.
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

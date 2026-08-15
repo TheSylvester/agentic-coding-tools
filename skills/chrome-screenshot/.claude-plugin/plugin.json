@@ -1,8 +1,0 @@
-{
-  "name": "chrome-screenshot",
-  "version": "1.0.0",
-  "description": "Extract browser screenshots from session transcripts",
-  "author": {
-    "name": "TheSylvester"
-  }
-}

@@ -1,8 +1,0 @@
-{
-  "name": "super-implement",
-  "version": "1.0.0",
-  "description": "Transform a plan into execution-ready prompt artifacts — single handoff prompts, parallel prompts, or phased prompt chains with orchestration.",
-  "author": {
-    "name": "TheSylvester"
-  }
-}

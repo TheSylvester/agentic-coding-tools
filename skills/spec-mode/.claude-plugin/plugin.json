@@ -1,8 +1,0 @@
-{
-  "name": "spec-mode",
-  "version": "1.0.0",
-  "description": "Interactive spec-building mode. Incrementally build a feature spec through conversation with decisions tracked in Agreed/Open sections.",
-  "author": {
-    "name": "TheSylvester"
-  }
-}

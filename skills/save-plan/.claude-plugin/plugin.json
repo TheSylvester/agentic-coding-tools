@@ -1,8 +1,0 @@
-{
-  "name": "save-plan",
-  "version": "1.0.0",
-  "description": "Save the current session's plan file to the project's .ai-reference/plans/ folder for editing and reuse.",
-  "author": {
-    "name": "TheSylvester"
-  }
-}

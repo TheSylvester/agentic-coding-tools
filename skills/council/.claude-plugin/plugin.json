@@ -1,8 +1,0 @@
-{
-  "name": "council",
-  "version": "1.0.0",
-  "description": "Multi-agent debate orchestrator. Runs parallel agent panels with a Chair synthesizing responses across rounds.",
-  "author": {
-    "name": "TheSylvester"
-  }
-}
